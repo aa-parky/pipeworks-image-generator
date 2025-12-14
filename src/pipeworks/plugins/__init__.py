@@ -1,13 +1,22 @@
 """Plugin system for extending Pipeworks functionality.
 
-This module will contain the plugin architecture for extending
-the image generator with custom functionality, models, and processors.
+Plugins provide modular capabilities that can be attached to any workflow:
+- SaveMetadataPlugin: Save prompts and parameters to .txt and .json files
+- Future: UpscalePlugin, StyleTransferPlugin, BatchProcessPlugin, etc.
 
-Future implementation will include:
-- Plugin base classes
-- Plugin discovery and loading
-- Plugin lifecycle management
-- Plugin API interfaces
+Plugins hook into the generation lifecycle:
+- on_generate_start: Before generation begins
+- on_generate_complete: After image is generated
+- on_before_save: Before image is saved
+- on_after_save: After image is saved
 """
 
-__all__ = []
+from pipeworks.plugins.base import PluginBase, PluginRegistry, plugin_registry
+from pipeworks.plugins.save_metadata import SaveMetadataPlugin
+
+__all__ = [
+    "PluginBase",
+    "PluginRegistry",
+    "plugin_registry",
+    "SaveMetadataPlugin",
+]
