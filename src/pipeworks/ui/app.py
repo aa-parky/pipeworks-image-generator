@@ -24,12 +24,13 @@ active_plugins: Dict[str, PluginBase] = {}
 generator: ImageGenerator = None  # Will be initialized with plugins
 
 
-def reinitialize_generator():
-    """Reinitialize the generator with current active plugins."""
+def update_generator_plugins():
+    """Update the generator's plugin list without recreating the generator."""
     global generator
-    plugin_list = [p for p in active_plugins.values() if p.enabled]
-    generator = ImageGenerator(config, plugins=plugin_list)
-    logger.info(f"Generator reinitialized with {len(plugin_list)} active plugins")
+    if generator is not None:
+        plugin_list = [p for p in active_plugins.values() if p.enabled]
+        generator.plugins = plugin_list
+        logger.info(f"Updated generator with {len(plugin_list)} active plugins")
 
 
 def toggle_plugin(plugin_name: str, enabled: bool, **plugin_config):
@@ -51,8 +52,8 @@ def toggle_plugin(plugin_name: str, enabled: bool, **plugin_config):
         if plugin_name in active_plugins:
             active_plugins[plugin_name].enabled = False
 
-    # Reinitialize generator with updated plugins
-    reinitialize_generator()
+    # Update generator's plugin list (doesn't recreate generator or unload model)
+    update_generator_plugins()
     return gr.update(visible=enabled)
 
 
