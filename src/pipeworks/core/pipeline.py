@@ -17,47 +17,18 @@ logger = logging.getLogger(__name__)
 class ImageGenerator:
     """Main image generation pipeline wrapper for Z-Image-Turbo."""
 
-    def __init__(
-        self, config: Optional[PipeworksConfig] = None, plugins: Optional[List] = None
-    ):
+    def __init__(self, config: Optional[PipeworksConfig] = None):
         """
         Initialize the image generator.
 
         Args:
             config: Configuration object. If None, uses global default config.
-            plugins: List of plugin instances to attach to the generator
         """
         self.config = config or default_config
         self.pipe: Optional[ZImagePipeline] = None
         self._model_loaded = False
-        self.plugins = plugins or []
 
         logger.info(f"Initialized ImageGenerator with model: {self.config.model_id}")
-        if self.plugins:
-            logger.info(f"Attached {len(self.plugins)} plugin(s)")
-
-    def add_plugin(self, plugin) -> None:
-        """Add a plugin to the generator."""
-        self.plugins.append(plugin)
-        logger.info(f"Added plugin: {plugin.name}")
-
-    def remove_plugin(self, plugin_name: str) -> None:
-        """Remove a plugin by name."""
-        self.plugins = [p for p in self.plugins if p.name != plugin_name]
-        logger.info(f"Removed plugin: {plugin_name}")
-
-    def _call_plugin_hook(self, hook_name: str, *args, **kwargs):
-        """Call a plugin hook on all enabled plugins."""
-        result = (args[0] if args else None,)
-        for plugin in self.plugins:
-            if plugin.enabled:
-                hook = getattr(plugin, hook_name, None)
-                if hook:
-                    result = hook(*args, **kwargs)
-                    # Update args with result for chaining
-                    if result is not None:
-                        args = (result,) if not isinstance(result, tuple) else result
-        return result if result != (None,) else args[0] if args else None
 
     def load_model(self) -> None:
         """Load the Z-Image-Turbo model into memory."""
@@ -120,7 +91,7 @@ class ImageGenerator:
         num_inference_steps: Optional[int] = None,
         seed: Optional[int] = None,
         guidance_scale: Optional[float] = None,
-    ) -> tuple[Image.Image, Dict[str, Any]]:
+    ) -> Image.Image:
         """
         Generate an image from a text prompt.
 
@@ -133,7 +104,7 @@ class ImageGenerator:
             guidance_scale: Guidance scale (should be 0.0 for Turbo)
 
         Returns:
-            Tuple of (Generated PIL Image, generation parameters dict)
+            Generated PIL Image
         """
         if not self._model_loaded:
             self.load_model()
@@ -152,20 +123,6 @@ class ImageGenerator:
             )
             guidance_scale = 0.0
 
-        # Build parameters dict
-        params = {
-            "prompt": prompt,
-            "width": width,
-            "height": height,
-            "num_inference_steps": num_inference_steps,
-            "seed": seed,
-            "guidance_scale": guidance_scale,
-            "model_id": self.config.model_id,
-        }
-
-        # Plugin hook: on_generate_start
-        params = self._call_plugin_hook("on_generate_start", params) or params
-
         logger.info(f"Generating image: {width}x{height}, steps={num_inference_steps}, seed={seed}")
         logger.info(f"Prompt: {prompt}")
 
@@ -177,21 +134,17 @@ class ImageGenerator:
         try:
             # Generate image
             output = self.pipe(
-                prompt=params["prompt"],
-                height=params["height"],
-                width=params["width"],
-                num_inference_steps=params["num_inference_steps"],
-                guidance_scale=params["guidance_scale"],
+                prompt=prompt,
+                height=height,
+                width=width,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
                 generator=generator,
             )
 
             image = output.images[0]
             logger.info("Image generated successfully!")
-
-            # Plugin hook: on_generate_complete
-            image = self._call_plugin_hook("on_generate_complete", image, params) or image
-
-            return image, params
+            return image
 
         except Exception as e:
             logger.error(f"Failed to generate image: {e}")
@@ -223,7 +176,7 @@ class ImageGenerator:
             Tuple of (generated image, save path)
         """
         # Generate image
-        image, params = self.generate(
+        image = self.generate(
             prompt=prompt,
             width=width,
             height=height,
@@ -239,26 +192,12 @@ class ImageGenerator:
             filename = f"pipeworks_{timestamp}{seed_suffix}.png"
             output_path = self.config.outputs_dir / filename
 
-        # Ensure it's a Path object
-        output_path = Path(output_path)
-
         # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Plugin hook: on_before_save
-        result = self._call_plugin_hook("on_before_save", image, output_path, params)
-        if result:
-            if isinstance(result, tuple) and len(result) == 2:
-                image, output_path = result
-            else:
-                image = result
 
         # Save image
         image.save(output_path)
         logger.info(f"Image saved to: {output_path}")
-
-        # Plugin hook: on_after_save
-        self._call_plugin_hook("on_after_save", image, output_path, params)
 
         return image, output_path
 
