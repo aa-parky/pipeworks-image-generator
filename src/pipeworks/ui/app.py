@@ -57,6 +57,32 @@ def toggle_plugin(plugin_name: str, enabled: bool, **plugin_config):
     return gr.update(visible=enabled)
 
 
+def set_aspect_ratio(ratio_name: str) -> tuple[int, int]:
+    """
+    Set width and height based on aspect ratio preset.
+
+    Args:
+        ratio_name: Name of the aspect ratio preset
+
+    Returns:
+        Tuple of (width, height)
+    """
+    aspect_ratios = {
+        "Square 1:1 (1024x1024)": (1024, 1024),
+        "Widescreen 16:9 (1280x720)": (1280, 720),
+        "Widescreen 16:9 (1600x896)": (1600, 896),
+        "Portrait 9:16 (720x1280)": (720, 1280),
+        "Portrait 9:16 (896x1600)": (896, 1600),
+        "Standard 3:2 (1280x832)": (1280, 832),
+        "Standard 2:3 (832x1280)": (832, 1280),
+        "Standard 3:2 (1536x1024)": (1536, 1024),
+        "Custom": (config.default_width, config.default_height),
+    }
+
+    width, height = aspect_ratios.get(ratio_name, (config.default_width, config.default_height))
+    return gr.update(value=width), gr.update(value=height)
+
+
 def generate_image(
     prompt: str,
     width: int,
@@ -171,6 +197,24 @@ def create_ui() -> tuple[gr.Blocks, str]:
                     placeholder="Describe the image you want to generate...",
                     lines=3,
                     value="A serene mountain landscape at sunset with vibrant colors",
+                )
+
+                # Aspect Ratio Preset Selector
+                aspect_ratio_dropdown = gr.Dropdown(
+                    label="Aspect Ratio Preset",
+                    choices=[
+                        "Square 1:1 (1024x1024)",
+                        "Widescreen 16:9 (1280x720)",
+                        "Widescreen 16:9 (1600x896)",
+                        "Portrait 9:16 (720x1280)",
+                        "Portrait 9:16 (896x1600)",
+                        "Standard 3:2 (1280x832)",
+                        "Standard 2:3 (832x1280)",
+                        "Standard 3:2 (1536x1024)",
+                        "Custom",
+                    ],
+                    value="Custom",
+                    info="Select a preset or choose Custom to manually adjust sliders",
                 )
 
                 with gr.Row():
@@ -316,6 +360,13 @@ def create_ui() -> tuple[gr.Blocks, str]:
         )
 
         # Event handlers
+        # Aspect ratio preset handler
+        aspect_ratio_dropdown.change(
+            fn=set_aspect_ratio,
+            inputs=[aspect_ratio_dropdown],
+            outputs=[width_slider, height_slider],
+        )
+
         generate_btn.click(
             fn=generate_image,
             inputs=[
