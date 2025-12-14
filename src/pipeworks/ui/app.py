@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import gradio as gr
+from PIL import Image
 
 from pipeworks.core.config import config
 from pipeworks.core.pipeline import ImageGenerator
@@ -23,6 +24,7 @@ generator = ImageGenerator(config)
 
 
 def save_metadata(
+    image: Image.Image,
     image_path: Path,
     prompt: str,
     width: int,
@@ -36,7 +38,8 @@ def save_metadata(
     Save prompt and metadata files.
 
     Args:
-        image_path: Path where image was saved
+        image: The generated PIL Image
+        image_path: Path where image was originally saved
         prompt: Generation prompt
         width: Image width
         height: Image height
@@ -46,15 +49,24 @@ def save_metadata(
         filename_prefix: Optional prefix for metadata files
     """
     try:
-        # Determine output directory
+        # Determine output directory and final image path
         if metadata_folder:
             output_dir = image_path.parent / metadata_folder
             output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save image to the metadata subfolder
+            new_image_path = output_dir / image_path.name
+            image.save(new_image_path)
+            logger.info(f"Saved image to: {new_image_path}")
+
+            # Use the new path for metadata reference
+            final_image_path = new_image_path
         else:
             output_dir = image_path.parent
+            final_image_path = image_path
 
         # Generate base filename
-        base_name = image_path.stem
+        base_name = final_image_path.stem
         if filename_prefix:
             base_name = f"{filename_prefix}_{base_name}"
 
@@ -74,7 +86,7 @@ def save_metadata(
             "guidance_scale": 0.0,
             "model_id": config.model_id,
             "timestamp": datetime.now().isoformat(),
-            "image_path": str(image_path),
+            "image_path": str(final_image_path),
         }
 
         json_path = output_dir / f"{base_name}.json"
@@ -133,6 +145,7 @@ def generate_image(
         # Save metadata if enabled
         if save_metadata_enabled:
             save_metadata(
+                image=image,
                 image_path=save_path,
                 prompt=prompt,
                 width=width,
