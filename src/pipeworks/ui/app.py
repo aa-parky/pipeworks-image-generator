@@ -88,17 +88,19 @@ def generate_image(
     width: int,
     height: int,
     num_steps: int,
+    batch_size: int,
     seed: int,
     use_random_seed: bool,
 ) -> tuple[str, str, str]:
     """
-    Generate an image from the UI inputs.
+    Generate image(s) from the UI inputs.
 
     Args:
         prompt: Text prompt
         width: Image width
         height: Image height
         num_steps: Number of inference steps
+        batch_size: Number of images to generate
         seed: Random seed
         use_random_seed: Whether to use a random seed
 
@@ -109,21 +111,41 @@ def generate_image(
         return None, "Error: Please provide a prompt", str(seed)
 
     try:
-        # Generate random seed if requested
-        actual_seed = random.randint(0, 2**32 - 1) if use_random_seed else seed
+        batch_size = max(1, int(batch_size))  # Ensure at least 1
+        generated_paths = []
+        seeds_used = []
 
-        # Generate and save image (plugins are called automatically by the pipeline)
-        image, save_path = generator.generate_and_save(
-            prompt=prompt,
-            width=width,
-            height=height,
-            num_inference_steps=num_steps,
-            seed=actual_seed,
-        )
+        for i in range(batch_size):
+            # Generate random seed if requested, or increment seed for batch
+            if use_random_seed:
+                actual_seed = random.randint(0, 2**32 - 1)
+            else:
+                actual_seed = seed + i
+
+            # Generate and save image (plugins are called automatically by the pipeline)
+            image, save_path = generator.generate_and_save(
+                prompt=prompt,
+                width=width,
+                height=height,
+                num_inference_steps=num_steps,
+                seed=actual_seed,
+            )
+
+            generated_paths.append(str(save_path))
+            seeds_used.append(actual_seed)
+            logger.info(f"Batch {i+1}/{batch_size} complete: {save_path}")
 
         # Create info text
         active_plugin_names = [p.name for p in generator.plugins if p.enabled]
         plugins_info = f"\n**Active Plugins:** {', '.join(active_plugin_names)}" if active_plugin_names else ""
+
+        # Format seeds display
+        if batch_size == 1:
+            seeds_display = str(seeds_used[0])
+            paths_display = str(generated_paths[0])
+        else:
+            seeds_display = f"{seeds_used[0]} - {seeds_used[-1]}"
+            paths_display = f"{len(generated_paths)} images saved to output folder"
 
         info = f"""
 **Generation Complete!**
@@ -131,11 +153,13 @@ def generate_image(
 **Prompt:** {prompt}
 **Dimensions:** {width}x{height}
 **Steps:** {num_steps}
-**Seed:** {actual_seed}
-**Saved to:** {save_path}{plugins_info}
+**Batch Size:** {batch_size}
+**Seeds:** {seeds_display}
+**Saved to:** {paths_display}{plugins_info}
         """
 
-        return str(save_path), info.strip(), str(actual_seed)
+        # Return the last generated image for display
+        return generated_paths[-1], info.strip(), str(seeds_used[-1])
 
     except Exception as e:
         logger.error(f"Error generating image: {e}", exc_info=True)
@@ -243,6 +267,14 @@ def create_ui() -> tuple[gr.Blocks, str]:
                 )
 
                 with gr.Row():
+                    batch_input = gr.Number(
+                        label="Batch Size",
+                        value=1,
+                        precision=0,
+                        minimum=1,
+                        maximum=100,
+                        info="Number of images to generate",
+                    )
                     seed_input = gr.Number(
                         label="Seed",
                         value=42,
@@ -374,6 +406,7 @@ def create_ui() -> tuple[gr.Blocks, str]:
                 width_slider,
                 height_slider,
                 steps_slider,
+                batch_input,
                 seed_input,
                 random_seed_checkbox,
             ],
