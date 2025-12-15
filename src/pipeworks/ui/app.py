@@ -152,8 +152,6 @@ def show_selected_image_info(evt: gr.SelectData) -> str:
     Returns:
         Formatted markdown with image info
     """
-    global image_prompt_map
-
     # evt.value is a dict with image data when type="filepath"
     # Extract the path from the dict
     if evt.value:
@@ -163,11 +161,27 @@ def show_selected_image_info(evt: gr.SelectData) -> str:
         else:
             image_path = evt.value
 
-        if image_path and image_path in image_prompt_map:
-            prompt = image_prompt_map[image_path]
-            filename = Path(image_path).name
+        if image_path:
+            image_path = Path(image_path)
+            filename = image_path.name
 
-            return f"""
+            # Look for metadata .txt file with same name
+            txt_path = image_path.with_suffix('.txt')
+
+            # Also check in metadata subfolder if it doesn't exist alongside image
+            if not txt_path.exists():
+                # Check in parent directory's metadata subfolder
+                metadata_path = image_path.parent / "metadata" / image_path.with_suffix('.txt').name
+                if metadata_path.exists():
+                    txt_path = metadata_path
+
+            # Try to read the prompt from the .txt file
+            if txt_path.exists():
+                try:
+                    with open(txt_path, 'r', encoding='utf-8') as f:
+                        prompt = f.read().strip()
+
+                    return f"""
 **Selected Image:** {filename}
 
 **Prompt Used:**
@@ -175,8 +189,11 @@ def show_selected_image_info(evt: gr.SelectData) -> str:
 {prompt}
 ```
 """
+                except Exception as e:
+                    logger.error(f"Error reading metadata file {txt_path}: {e}")
+                    return f"*Error reading prompt metadata: {str(e)}*"
 
-    return "*No prompt information available for this image*"
+    return "*No prompt metadata found for this image (enable 'Save Metadata' plugin)*"
 
 
 def get_available_folders() -> List[str]:
