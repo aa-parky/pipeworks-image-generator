@@ -2,7 +2,6 @@
 
 import logging
 import random
-from pathlib import Path
 from typing import Dict, List
 
 import gradio as gr
@@ -27,7 +26,6 @@ active_plugins: Dict[str, PluginBase] = {}
 generator: ImageGenerator = None  # Will be initialized with plugins
 tokenizer_analyzer: TokenizerAnalyzer = None  # Will be initialized on startup
 prompt_builder: PromptBuilder = None  # Will be initialized on startup
-image_prompt_map: Dict[str, str] = {}  # Map image paths to prompts
 
 
 def update_generator_plugins():
@@ -140,60 +138,6 @@ def analyze_prompt(prompt: str) -> str:
     except Exception as e:
         logger.error(f"Error analyzing prompt: {e}", exc_info=True)
         return f"*Error analyzing prompt: {str(e)}*"
-
-
-def show_selected_image_info(evt: gr.SelectData) -> str:
-    """
-    Display prompt info for selected image from gallery.
-
-    Args:
-        evt: SelectData event containing the selected image index
-
-    Returns:
-        Formatted markdown with image info
-    """
-    # evt.value is a dict with image data when type="filepath"
-    # Extract the path from the dict
-    if evt.value:
-        # evt.value can be a dict like {"name": "path/to/file.png"} or just the path
-        if isinstance(evt.value, dict):
-            image_path = evt.value.get("name") or evt.value.get("path")
-        else:
-            image_path = evt.value
-
-        if image_path:
-            image_path = Path(image_path)
-            filename = image_path.name
-
-            # Look for metadata .txt file with same name
-            txt_path = image_path.with_suffix('.txt')
-
-            # Also check in metadata subfolder if it doesn't exist alongside image
-            if not txt_path.exists():
-                # Check in parent directory's metadata subfolder
-                metadata_path = image_path.parent / "metadata" / image_path.with_suffix('.txt').name
-                if metadata_path.exists():
-                    txt_path = metadata_path
-
-            # Try to read the prompt from the .txt file
-            if txt_path.exists():
-                try:
-                    with open(txt_path, 'r', encoding='utf-8') as f:
-                        prompt = f.read().strip()
-
-                    return f"""
-**Selected Image:** {filename}
-
-**Prompt Used:**
-```
-{prompt}
-```
-"""
-                except Exception as e:
-                    logger.error(f"Error reading metadata file {txt_path}: {e}")
-                    return f"*Error reading prompt metadata: {str(e)}*"
-
-    return "*No prompt metadata found for this image (enable 'Save Metadata' plugin)*"
 
 
 def get_available_folders() -> List[str]:
@@ -487,10 +431,6 @@ def generate_image(
 
                 generated_paths.append(str(save_path))
                 seeds_used.append(actual_seed)
-
-                # Store prompt for this image
-                global image_prompt_map
-                image_prompt_map[str(save_path)] = current_prompt
 
                 image_num = run * batch_size + i + 1
                 logger.info(f"Image {image_num}/{total_images} complete (Run {run+1}, Batch {i+1}): {save_path}")
@@ -809,12 +749,6 @@ def create_ui() -> tuple[gr.Blocks, str]:
                     label="Seed Used",
                     interactive=False,
                     value="42",
-                )
-
-                # Selected image info
-                selected_image_info = gr.Markdown(
-                    label="Selected Image Info",
-                    value="*Click an image to see its prompt*",
                 )
 
                 # Info display
