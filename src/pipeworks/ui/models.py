@@ -119,6 +119,12 @@ class UIState:
     prompt_builder: Any | None = None  # PromptBuilder instance
     active_plugins: dict[str, Any] = field(default_factory=dict)  # Dict[str, PluginBase]
 
+    # Gallery browser state
+    gallery_browser: Any | None = None  # GalleryBrowser instance
+    gallery_current_path: str = ""  # Current subfolder in outputs/
+    gallery_images: list[str] = field(default_factory=list)  # Cached image list
+    gallery_selected_index: int | None = None  # Currently selected image index
+
     def is_initialized(self) -> bool:
         """Check if the state has been initialized with core components.
 

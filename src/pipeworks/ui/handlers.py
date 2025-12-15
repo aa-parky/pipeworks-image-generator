@@ -443,3 +443,235 @@ def update_plugin_config_handler(
         )
         return new_state
     return state
+
+
+# Gallery Browser Handlers
+
+
+def load_gallery_folder(
+    selected_item: str, current_path: str, state: UIState
+) -> tuple[gr.Dropdown, str, list[str], UIState]:
+    """Navigate folders or load images from current path.
+
+    Args:
+        selected_item: Item selected from dropdown (folder or image)
+        current_path: Current path being browsed
+        state: UI state
+
+    Returns:
+        Tuple of (dropdown_update, new_path, gallery_images, updated_state)
+    """
+    try:
+        # Initialize state if needed
+        state = initialize_ui_state(state)
+
+        # Handle folder navigation
+        if selected_item.startswith("📁"):
+            folder_name = selected_item[2:].strip()  # Remove emoji prefix
+
+            if folder_name == "..":
+                # Go up one level
+                if current_path:
+                    new_path = str(Path(current_path).parent)
+                    if new_path == ".":
+                        new_path = ""
+                else:
+                    new_path = ""
+            else:
+                # Navigate into folder
+                new_path = str(Path(current_path) / folder_name) if current_path else folder_name
+
+            # Update current path in state
+            state.gallery_current_path = new_path
+
+            # Get items in new path
+            folders, files = state.gallery_browser.get_items_in_path(new_path)
+
+            # Build dropdown choices
+            choices = []
+            if new_path:  # Add parent navigation if not at root
+                choices.append("📁 ..")
+
+            # Add folders with emoji
+            for folder in folders:
+                choices.append(f"📁 {folder}")
+
+            # Don't add files to dropdown - they're shown in gallery
+            if not choices:
+                choices = ["(No folders)"]
+
+            # Scan for images in new path
+            images = state.gallery_browser.scan_images(new_path)
+            state.gallery_images = images
+
+            return gr.update(choices=choices, value=choices[0]), new_path, images, state
+
+        else:
+            # Not a folder selection, just load images from current path
+            images = state.gallery_browser.scan_images(current_path)
+            state.gallery_images = images
+
+            # Get current dropdown choices
+            folders, _ = state.gallery_browser.get_items_in_path(current_path)
+            choices = []
+            if current_path:
+                choices.append("📁 ..")
+            for folder in folders:
+                choices.append(f"📁 {folder}")
+            if not choices:
+                choices = ["(No folders)"]
+
+            return gr.update(choices=choices), current_path, images, state
+
+    except Exception as e:
+        logger.error(f"Error loading gallery folder: {e}", exc_info=True)
+        return gr.update(), current_path, [], state
+
+
+def select_gallery_image(
+    evt: gr.SelectData, show_json: str, state: UIState
+) -> tuple[str, str, UIState]:
+    """Display selected image with its metadata.
+
+    Args:
+        evt: Gradio SelectData event containing selected index
+        show_json: Which metadata format to show ("Text (.txt)" or "JSON (.json)")
+        state: UI state
+
+    Returns:
+        Tuple of (image_path, metadata_markdown, updated_state)
+    """
+    try:
+        # Initialize state if needed
+        state = initialize_ui_state(state)
+
+        # Get selected index from event
+        selected_index = evt.index
+
+        # Check if we have images cached
+        if not state.gallery_images or selected_index >= len(state.gallery_images):
+            return None, "*No image selected*", state
+
+        # Get image path
+        image_path = state.gallery_images[selected_index]
+        image_name = Path(image_path).name
+
+        # Store selected index in state
+        state.gallery_selected_index = selected_index
+
+        # Read metadata based on toggle
+        if "JSON" in show_json:
+            json_data = state.gallery_browser.read_json_metadata(image_path)
+            metadata_md = state.gallery_browser.format_metadata_json(json_data, image_name)
+        else:
+            txt_content = state.gallery_browser.read_txt_metadata(image_path)
+            metadata_md = state.gallery_browser.format_metadata_txt(txt_content, image_name)
+
+        return image_path, metadata_md, state
+
+    except Exception as e:
+        logger.error(f"Error selecting gallery image: {e}", exc_info=True)
+        return None, f"*Error loading image: {str(e)}*", state
+
+
+def refresh_gallery(current_path: str, state: UIState) -> tuple[list[str], UIState]:
+    """Refresh image list in current path.
+
+    Args:
+        current_path: Current path being browsed
+        state: UI state
+
+    Returns:
+        Tuple of (gallery_images, updated_state)
+    """
+    try:
+        # Initialize state if needed
+        state = initialize_ui_state(state)
+
+        # Scan for images
+        images = state.gallery_browser.scan_images(current_path)
+        state.gallery_images = images
+
+        return images, state
+
+    except Exception as e:
+        logger.error(f"Error refreshing gallery: {e}", exc_info=True)
+        return [], state
+
+
+def toggle_metadata_format(show_json: str, state: UIState) -> tuple[str, UIState]:
+    """Switch between .txt and .json metadata view.
+
+    Args:
+        show_json: Which metadata format to show ("Text (.txt)" or "JSON (.json)")
+        state: UI state
+
+    Returns:
+        Tuple of (metadata_markdown, updated_state)
+    """
+    try:
+        # Initialize state if needed
+        state = initialize_ui_state(state)
+
+        # Check if we have a selected image
+        if state.gallery_selected_index is None or not state.gallery_images:
+            return "*Select an image to view metadata*", state
+
+        if state.gallery_selected_index >= len(state.gallery_images):
+            return "*No image selected*", state
+
+        # Get selected image
+        image_path = state.gallery_images[state.gallery_selected_index]
+        image_name = Path(image_path).name
+
+        # Read metadata based on toggle
+        if "JSON" in show_json:
+            json_data = state.gallery_browser.read_json_metadata(image_path)
+            metadata_md = state.gallery_browser.format_metadata_json(json_data, image_name)
+        else:
+            txt_content = state.gallery_browser.read_txt_metadata(image_path)
+            metadata_md = state.gallery_browser.format_metadata_txt(txt_content, image_name)
+
+        return metadata_md, state
+
+    except Exception as e:
+        logger.error(f"Error toggling metadata format: {e}", exc_info=True)
+        return f"*Error loading metadata: {str(e)}*", state
+
+
+def initialize_gallery_browser(state: UIState) -> tuple[gr.Dropdown, str, list[str], UIState]:
+    """Initialize gallery browser on tab load.
+
+    Args:
+        state: UI state
+
+    Returns:
+        Tuple of (dropdown_update, current_path, gallery_images, updated_state)
+    """
+    try:
+        # Initialize state if needed
+        state = initialize_ui_state(state)
+
+        # Start at root of outputs directory
+        current_path = ""
+        state.gallery_current_path = current_path
+
+        # Get folders and images at root
+        folders, _ = state.gallery_browser.get_items_in_path(current_path)
+
+        # Build dropdown choices
+        choices = []
+        for folder in folders:
+            choices.append(f"📁 {folder}")
+        if not choices:
+            choices = ["(No folders)"]
+
+        # Scan for images at root
+        images = state.gallery_browser.scan_images(current_path)
+        state.gallery_images = images
+
+        return gr.update(choices=choices, value=choices[0]), current_path, images, state
+
+    except Exception as e:
+        logger.error(f"Error initializing gallery browser: {e}", exc_info=True)
+        return gr.update(choices=["(Error)"]), "", [], state

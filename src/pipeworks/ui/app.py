@@ -12,8 +12,13 @@ from .handlers import (
     analyze_prompt,
     build_combined_prompt,
     generate_image,
+    initialize_gallery_browser,
+    load_gallery_folder,
     navigate_file_selection,
+    refresh_gallery,
+    select_gallery_image,
     set_aspect_ratio,
+    toggle_metadata_format,
     toggle_save_metadata_handler,
     update_plugin_config_handler,
 )
@@ -59,205 +64,221 @@ def create_ui() -> gr.Blocks:
             """
         )
 
-        with gr.Row():
-            with gr.Column(scale=1):
-                # Input controls
-                gr.Markdown("### Generation Settings")
+        with gr.Tabs():
+            with gr.Tab("Generate"):
+                # Main generation UI
+                create_generation_tab(ui_state)
 
-                prompt_input = gr.Textbox(
-                    label="Prompt",
-                    placeholder="Describe the image you want to generate...",
-                    lines=3,
-                    value="A serene mountain landscape at sunset with vibrant colors",
+            with gr.Tab("Gallery Browser"):
+                # Gallery browser UI
+                create_gallery_tab(ui_state)
+
+    return app
+
+
+def create_generation_tab(ui_state):
+    """Create the main generation tab UI.
+
+    Args:
+        ui_state: UI state component
+    """
+    with gr.Row():
+        with gr.Column(scale=1):
+            # Input controls
+            gr.Markdown("### Generation Settings")
+
+            prompt_input = gr.Textbox(
+                label="Prompt",
+                placeholder="Describe the image you want to generate...",
+                lines=3,
+                value="A serene mountain landscape at sunset with vibrant colors",
+            )
+
+            # Prompt Builder
+            with gr.Accordion("Prompt Builder", open=False):
+                gr.Markdown(
+                    "*Build prompts by combining text and random lines from files "
+                    "in the `inputs/` directory*\n\n"
+                    "*Click folders (📁) to navigate, select files to use*"
                 )
 
-                # Prompt Builder
-                with gr.Accordion("Prompt Builder", open=False):
-                    gr.Markdown(
-                        "*Build prompts by combining text and random lines from files "
-                        "in the `inputs/` directory*\n\n"
-                        "*Click folders (📁) to navigate, select files to use*"
-                    )
+                # Initialize file browser choices
+                initial_choices = ["(None)"]
+                try:
+                    from pipeworks.core.prompt_builder import PromptBuilder
 
-                    # Initialize file browser choices
-                    initial_choices = ["(None)"]
-                    try:
-                        from pipeworks.core.prompt_builder import PromptBuilder
+                    temp_pb = PromptBuilder(config.inputs_dir)
+                    folders, files = temp_pb.get_items_in_path("")
+                    for folder in folders:
+                        initial_choices.append(f"📁 {folder}")
+                    initial_choices.extend(files)
+                except Exception as e:
+                    logger.error(f"Error initializing file browser: {e}")
 
-                        temp_pb = PromptBuilder(config.inputs_dir)
-                        folders, files = temp_pb.get_items_in_path("")
-                        for folder in folders:
-                            initial_choices.append(f"📁 {folder}")
-                        initial_choices.extend(files)
-                    except Exception as e:
-                        logger.error(f"Error initializing file browser: {e}")
+                # Create three segment components (eliminates code duplication!)
+                start_segment, middle_segment, end_segment = create_three_segments(initial_choices)
 
-                    # Create three segment components (eliminates code duplication!)
-                    start_segment, middle_segment, end_segment = create_three_segments(
-                        initial_choices
-                    )
+                # Build Button
+                build_prompt_btn = gr.Button("Build Prompt", variant="secondary")
 
-                    # Build Button
-                    build_prompt_btn = gr.Button("Build Prompt", variant="secondary")
-
-                # Tokenizer Analyzer
-                with gr.Accordion("Tokenizer Analyzer", open=False):
-                    tokenizer_output = gr.Markdown(
-                        value="*Enter a prompt to see tokenization analysis*", label="Analysis"
-                    )
-
-                # Aspect Ratio Preset Selector
-                aspect_ratio_dropdown = gr.Dropdown(
-                    label="Aspect Ratio Preset",
-                    choices=list(ASPECT_RATIOS.keys()),
-                    value="Custom",
-                    info="Select a preset or choose Custom to manually adjust sliders",
+            # Tokenizer Analyzer
+            with gr.Accordion("Tokenizer Analyzer", open=False):
+                tokenizer_output = gr.Markdown(
+                    value="*Enter a prompt to see tokenization analysis*", label="Analysis"
                 )
 
-                with gr.Row():
-                    width_slider = gr.Slider(
-                        minimum=512,
-                        maximum=2048,
-                        step=64,
-                        value=config.default_width,
-                        label="Width",
-                    )
-                    height_slider = gr.Slider(
-                        minimum=512,
-                        maximum=2048,
-                        step=64,
-                        value=config.default_height,
-                        label="Height",
-                    )
+            # Aspect Ratio Preset Selector
+            aspect_ratio_dropdown = gr.Dropdown(
+                label="Aspect Ratio Preset",
+                choices=list(ASPECT_RATIOS.keys()),
+                value="Custom",
+                info="Select a preset or choose Custom to manually adjust sliders",
+            )
 
-                steps_slider = gr.Slider(
+            with gr.Row():
+                width_slider = gr.Slider(
+                    minimum=512,
+                    maximum=2048,
+                    step=64,
+                    value=config.default_width,
+                    label="Width",
+                )
+                height_slider = gr.Slider(
+                    minimum=512,
+                    maximum=2048,
+                    step=64,
+                    value=config.default_height,
+                    label="Height",
+                )
+
+            steps_slider = gr.Slider(
+                minimum=1,
+                maximum=20,
+                step=1,
+                value=config.num_inference_steps,
+                label="Inference Steps",
+                info="Z-Image-Turbo works best with 9 steps",
+            )
+
+            with gr.Row():
+                batch_input = gr.Number(
+                    label="Batch Size",
+                    value=1,
+                    precision=0,
                     minimum=1,
-                    maximum=20,
-                    step=1,
-                    value=config.num_inference_steps,
-                    label="Inference Steps",
-                    info="Z-Image-Turbo works best with 9 steps",
+                    maximum=100,
+                    info="Images per run",
+                )
+                runs_input = gr.Number(
+                    label="Runs",
+                    value=1,
+                    precision=0,
+                    minimum=1,
+                    maximum=100,
+                    info="Number of runs to execute",
+                )
+                seed_input = gr.Number(
+                    label="Seed",
+                    value=DEFAULT_SEED,
+                    precision=0,
+                    minimum=0,
+                    maximum=MAX_SEED,
+                )
+                random_seed_checkbox = gr.Checkbox(
+                    label="Random Seed",
+                    value=False,
+                    info="Generate a new random seed each time",
                 )
 
-                with gr.Row():
-                    batch_input = gr.Number(
-                        label="Batch Size",
-                        value=1,
-                        precision=0,
-                        minimum=1,
-                        maximum=100,
-                        info="Images per run",
-                    )
-                    runs_input = gr.Number(
-                        label="Runs",
-                        value=1,
-                        precision=0,
-                        minimum=1,
-                        maximum=100,
-                        info="Number of runs to execute",
-                    )
-                    seed_input = gr.Number(
-                        label="Seed",
-                        value=DEFAULT_SEED,
-                        precision=0,
-                        minimum=0,
-                        maximum=MAX_SEED,
-                    )
-                    random_seed_checkbox = gr.Checkbox(
-                        label="Random Seed",
-                        value=False,
-                        info="Generate a new random seed each time",
-                    )
+            # Plugins Section
+            with gr.Accordion("Plugins", open=True):
+                with gr.Group(elem_classes="plugin-section"):
+                    # Save Metadata Plugin
+                    with gr.Group():
+                        save_metadata_check = gr.Checkbox(
+                            label="Save Metadata (.txt + .json)",
+                            value=False,
+                            info="Save prompt and generation parameters to files",
+                        )
 
-                # Plugins Section
-                with gr.Accordion("Plugins", open=True):
-                    with gr.Group(elem_classes="plugin-section"):
-                        # Save Metadata Plugin
-                        with gr.Group():
-                            save_metadata_check = gr.Checkbox(
-                                label="Save Metadata (.txt + .json)",
-                                value=False,
-                                info="Save prompt and generation parameters to files",
+                        with gr.Group(visible=False) as metadata_settings:
+                            metadata_folder = gr.Textbox(
+                                label="Metadata Subfolder",
+                                value="metadata",
+                                placeholder="Leave empty to save alongside images",
+                                info="Subfolder within outputs directory",
+                            )
+                            metadata_prefix = gr.Textbox(
+                                label="Filename Prefix",
+                                value="",
+                                placeholder="Optional prefix for metadata files",
                             )
 
-                            with gr.Group(visible=False) as metadata_settings:
-                                metadata_folder = gr.Textbox(
-                                    label="Metadata Subfolder",
-                                    value="metadata",
-                                    placeholder="Leave empty to save alongside images",
-                                    info="Subfolder within outputs directory",
-                                )
-                                metadata_prefix = gr.Textbox(
-                                    label="Filename Prefix",
-                                    value="",
-                                    placeholder="Optional prefix for metadata files",
-                                )
+                        # Plugin toggle handler
+                        save_metadata_check.change(
+                            fn=toggle_save_metadata_handler,
+                            inputs=[
+                                save_metadata_check,
+                                metadata_folder,
+                                metadata_prefix,
+                                ui_state,
+                            ],
+                            outputs=[metadata_settings, ui_state],
+                        )
 
-                            # Plugin toggle handler
-                            save_metadata_check.change(
-                                fn=toggle_save_metadata_handler,
-                                inputs=[
-                                    save_metadata_check,
-                                    metadata_folder,
-                                    metadata_prefix,
-                                    ui_state,
-                                ],
-                                outputs=[metadata_settings, ui_state],
-                            )
+                        # Update plugin config when settings change
+                        metadata_folder.change(
+                            fn=update_plugin_config_handler,
+                            inputs=[
+                                save_metadata_check,
+                                metadata_folder,
+                                metadata_prefix,
+                                ui_state,
+                            ],
+                            outputs=[ui_state],
+                        )
+                        metadata_prefix.change(
+                            fn=update_plugin_config_handler,
+                            inputs=[
+                                save_metadata_check,
+                                metadata_folder,
+                                metadata_prefix,
+                                ui_state,
+                            ],
+                            outputs=[ui_state],
+                        )
 
-                            # Update plugin config when settings change
-                            metadata_folder.change(
-                                fn=update_plugin_config_handler,
-                                inputs=[
-                                    save_metadata_check,
-                                    metadata_folder,
-                                    metadata_prefix,
-                                    ui_state,
-                                ],
-                                outputs=[ui_state],
-                            )
-                            metadata_prefix.change(
-                                fn=update_plugin_config_handler,
-                                inputs=[
-                                    save_metadata_check,
-                                    metadata_folder,
-                                    metadata_prefix,
-                                    ui_state,
-                                ],
-                                outputs=[ui_state],
-                            )
+            generate_btn = gr.Button(
+                "Generate Image",
+                variant="primary",
+                size="lg",
+            )
 
-                generate_btn = gr.Button(
-                    "Generate Image",
-                    variant="primary",
-                    size="lg",
-                )
+        with gr.Column(scale=1):
+            # Output display
+            gr.Markdown("### Generated Images")
 
-            with gr.Column(scale=1):
-                # Output display
-                gr.Markdown("### Generated Images")
+            image_output = gr.Gallery(
+                label="Output",
+                type="filepath",
+                height=600,
+                columns=2,
+                rows=2,
+                object_fit="contain",
+            )
 
-                image_output = gr.Gallery(
-                    label="Output",
-                    type="filepath",
-                    height=600,
-                    columns=2,
-                    rows=2,
-                    object_fit="contain",
-                )
+            # Show the seed that was actually used
+            seed_used = gr.Textbox(
+                label="Seed Used",
+                interactive=False,
+                value=str(DEFAULT_SEED),
+            )
 
-                # Show the seed that was actually used
-                seed_used = gr.Textbox(
-                    label="Seed Used",
-                    interactive=False,
-                    value=str(DEFAULT_SEED),
-                )
-
-                # Info display
-                info_output = gr.Markdown(
-                    label="Generation Info",
-                    value="*Ready to generate images*",
-                )
+            # Info display
+            info_output = gr.Markdown(
+                label="Generation Info",
+                value="*Ready to generate images*",
+            )
 
         # Model info footer
         gr.Markdown(
@@ -364,13 +385,6 @@ def create_ui() -> gr.Blocks:
             outputs=[tokenizer_output, ui_state],
         )
 
-        # Trigger analysis on app load
-        app.load(
-            fn=analyze_prompt,
-            inputs=[prompt_input, ui_state],
-            outputs=[tokenizer_output, ui_state],
-        )
-
         # Generate button handler
         def generate_wrapper(*values):
             """Wrapper to convert segment values to SegmentConfig objects."""
@@ -429,7 +443,103 @@ def create_ui() -> gr.Blocks:
             outputs=[image_output, info_output, seed_used, ui_state],
         )
 
-    return app
+
+def create_gallery_tab(ui_state):
+    """Create the gallery browser tab UI.
+
+    Args:
+        ui_state: UI state component
+    """
+    gr.Markdown("### Browse Generated Images")
+
+    with gr.Row():
+        folder_dropdown = gr.Dropdown(
+            label="Browse Folders",
+            choices=["(No folders)"],
+            value="(No folders)",
+            scale=3,
+        )
+        refresh_btn = gr.Button("Refresh", size="sm", scale=1)
+
+    # Hidden state for current path
+    current_path_state = gr.State("")
+
+    current_path_display = gr.Markdown("**Current:** /outputs")
+
+    with gr.Row():
+        with gr.Column(scale=2):
+            gallery = gr.Gallery(
+                label="Images",
+                columns=4,
+                height=600,
+                object_fit="cover",
+                type="filepath",
+                show_label=True,
+            )
+
+        with gr.Column(scale=1):
+            selected_image = gr.Image(
+                label="Selected Image",
+                type="filepath",
+                height=400,
+                show_label=True,
+            )
+
+            metadata_toggle = gr.Radio(
+                choices=["Text (.txt)", "JSON (.json)"],
+                value="Text (.txt)",
+                label="Metadata Format",
+            )
+
+            metadata_display = gr.Markdown(
+                value="*Select an image to view metadata*",
+                label="Metadata",
+            )
+
+    # Event handlers for gallery browser
+
+    # Initialize gallery on load
+    gallery.load(
+        fn=initialize_gallery_browser,
+        inputs=[ui_state],
+        outputs=[folder_dropdown, current_path_state, gallery, ui_state],
+    ).then(
+        fn=lambda path: f"**Current:** /outputs/{path}" if path else "**Current:** /outputs",
+        inputs=[current_path_state],
+        outputs=[current_path_display],
+    )
+
+    # Folder navigation
+    folder_dropdown.change(
+        fn=load_gallery_folder,
+        inputs=[folder_dropdown, current_path_state, ui_state],
+        outputs=[folder_dropdown, current_path_state, gallery, ui_state],
+    ).then(
+        fn=lambda path: f"**Current:** /outputs/{path}" if path else "**Current:** /outputs",
+        inputs=[current_path_state],
+        outputs=[current_path_display],
+    )
+
+    # Image selection - uses gr.SelectData for event
+    gallery.select(
+        fn=select_gallery_image,
+        inputs=[metadata_toggle, ui_state],
+        outputs=[selected_image, metadata_display, ui_state],
+    )
+
+    # Metadata format toggle
+    metadata_toggle.change(
+        fn=toggle_metadata_format,
+        inputs=[metadata_toggle, ui_state],
+        outputs=[metadata_display, ui_state],
+    )
+
+    # Refresh button
+    refresh_btn.click(
+        fn=refresh_gallery,
+        inputs=[current_path_state, ui_state],
+        outputs=[gallery, ui_state],
+    )
 
 
 def main():

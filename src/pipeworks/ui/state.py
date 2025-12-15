@@ -3,6 +3,7 @@
 import logging
 
 from pipeworks.core.config import config
+from pipeworks.core.gallery_browser import GalleryBrowser
 from pipeworks.core.pipeline import ImageGenerator
 from pipeworks.core.prompt_builder import PromptBuilder
 from pipeworks.core.tokenizer import TokenizerAnalyzer
@@ -64,6 +65,12 @@ def initialize_ui_state(state: UIState | None = None) -> UIState:
             logger.info("Initializing PromptBuilder")
             state.prompt_builder = PromptBuilder(config.inputs_dir)
             logger.info("PromptBuilder initialized successfully")
+
+        # Initialize gallery browser (lazy-loaded for gallery tab)
+        if state.gallery_browser is None:
+            logger.info("Initializing GalleryBrowser")
+            state.gallery_browser = GalleryBrowser(config.outputs_dir)
+            logger.info("GalleryBrowser initialized successfully")
 
         logger.info(f"UIState initialization complete: {state}")
         return state
@@ -151,6 +158,7 @@ def cleanup_ui_state(state: UIState) -> None:
         state.generator = None
         state.tokenizer_analyzer = None
         state.prompt_builder = None
+        state.gallery_browser = None
         state.active_plugins.clear()
 
         logger.info("UIState cleanup complete")
