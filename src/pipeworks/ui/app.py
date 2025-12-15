@@ -2,6 +2,7 @@
 
 import logging
 import random
+from pathlib import Path
 from typing import Dict, List
 
 import gradio as gr
@@ -26,6 +27,7 @@ active_plugins: Dict[str, PluginBase] = {}
 generator: ImageGenerator = None  # Will be initialized with plugins
 tokenizer_analyzer: TokenizerAnalyzer = None  # Will be initialized on startup
 prompt_builder: PromptBuilder = None  # Will be initialized on startup
+image_prompt_map: Dict[str, str] = {}  # Map image paths to prompts
 
 
 def update_generator_plugins():
@@ -138,6 +140,36 @@ def analyze_prompt(prompt: str) -> str:
     except Exception as e:
         logger.error(f"Error analyzing prompt: {e}", exc_info=True)
         return f"*Error analyzing prompt: {str(e)}*"
+
+
+def show_selected_image_info(evt: gr.SelectData) -> str:
+    """
+    Display prompt info for selected image from gallery.
+
+    Args:
+        evt: SelectData event containing the selected image index
+
+    Returns:
+        Formatted markdown with image info
+    """
+    global image_prompt_map
+
+    # evt.index is the index of the selected image in the gallery
+    # evt.value is the image data (path when type="filepath")
+    if evt.value and evt.value in image_prompt_map:
+        prompt = image_prompt_map[evt.value]
+        filename = Path(evt.value).name
+
+        return f"""
+**Selected Image:** {filename}
+
+**Prompt Used:**
+```
+{prompt}
+```
+"""
+    else:
+        return "*No prompt information available for this image*"
 
 
 def get_available_folders() -> List[str]:
@@ -431,6 +463,10 @@ def generate_image(
 
                 generated_paths.append(str(save_path))
                 seeds_used.append(actual_seed)
+
+                # Store prompt for this image
+                global image_prompt_map
+                image_prompt_map[str(save_path)] = current_prompt
 
                 image_num = run * batch_size + i + 1
                 logger.info(f"Image {image_num}/{total_images} complete (Run {run+1}, Batch {i+1}): {save_path}")
@@ -751,6 +787,12 @@ def create_ui() -> tuple[gr.Blocks, str]:
                     value="42",
                 )
 
+                # Selected image info
+                selected_image_info = gr.Markdown(
+                    label="Selected Image Info",
+                    value="*Click an image to see its prompt*",
+                )
+
                 # Info display
                 info_output = gr.Markdown(
                     label="Generation Info",
@@ -866,6 +908,12 @@ def create_ui() -> tuple[gr.Blocks, str]:
                 end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count, end_dynamic,
             ],
             outputs=[image_output, info_output, seed_used],
+        )
+
+        # Gallery select handler - show prompt when image is clicked
+        image_output.select(
+            fn=show_selected_image_info,
+            outputs=[selected_image_info],
         )
 
     return app, custom_css
