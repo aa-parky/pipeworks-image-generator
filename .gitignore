@@ -218,6 +218,10 @@ models/
 *.safetensors
 *.ckpt
 
+# Input assets
+inputs/
+!inputs/.gitkeep
+
 # Generated outputs
 outputs/
 !outputs/.gitkeep

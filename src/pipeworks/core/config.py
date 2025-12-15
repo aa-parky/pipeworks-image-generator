@@ -70,6 +70,10 @@ class PipeworksConfig(BaseSettings):
         default=Path("models"),
         description="Directory to cache models",
     )
+    inputs_dir: Path = Field(
+        default=Path("inputs"),
+        description="Directory for input images and assets",
+    )
     outputs_dir: Path = Field(
         default=Path("outputs"),
         description="Directory to save generated images",
@@ -95,6 +99,7 @@ class PipeworksConfig(BaseSettings):
         super().__init__(**kwargs)
         # Ensure directories exist
         self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.inputs_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
 
 
