@@ -652,6 +652,18 @@ def initialize_gallery_browser(state: UIState) -> tuple[gr.Dropdown, str, list[s
         # Initialize state if needed
         state = initialize_ui_state(state)
 
+        # Skip if already initialized to prevent infinite loop
+        if state.gallery_initialized:
+            return (
+                gr.update(),
+                state.gallery_current_path,
+                state.gallery_images,
+                state,
+            )
+
+        # Mark as initialized
+        state.gallery_initialized = True
+
         # Start at root of outputs directory
         current_path = ""
         state.gallery_current_path = current_path

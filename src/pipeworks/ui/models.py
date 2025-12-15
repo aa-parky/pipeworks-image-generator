@@ -124,6 +124,7 @@ class UIState:
     gallery_current_path: str = ""  # Current subfolder in outputs/
     gallery_images: list[str] = field(default_factory=list)  # Cached image list
     gallery_selected_index: int | None = None  # Currently selected image index
+    gallery_initialized: bool = False  # Track if gallery has been initialized
 
     def is_initialized(self) -> bool:
         """Check if the state has been initialized with core components.
