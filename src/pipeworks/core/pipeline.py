@@ -3,14 +3,15 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import torch
 from diffusers import ZImagePipeline
 from PIL import Image
 
-from .config import PipeworksConfig, config as default_config
 from pipeworks.plugins.base import PluginBase
+
+from .config import PipeworksConfig
+from .config import config as default_config
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,9 @@ logger = logging.getLogger(__name__)
 class ImageGenerator:
     """Main image generation pipeline wrapper for Z-Image-Turbo."""
 
-    def __init__(self, config: Optional[PipeworksConfig] = None, plugins: Optional[List[PluginBase]] = None):
+    def __init__(
+        self, config: PipeworksConfig | None = None, plugins: list[PluginBase] | None = None
+    ):
         """
         Initialize the image generator.
 
@@ -27,9 +30,9 @@ class ImageGenerator:
             plugins: List of plugin instances to use
         """
         self.config = config or default_config
-        self.pipe: Optional[ZImagePipeline] = None
+        self.pipe: ZImagePipeline | None = None
         self._model_loaded = False
-        self.plugins: List[PluginBase] = plugins or []
+        self.plugins: list[PluginBase] = plugins or []
 
         logger.info(f"Initialized ImageGenerator with model: {self.config.model_id}")
         if self.plugins:
@@ -91,11 +94,11 @@ class ImageGenerator:
     def generate(
         self,
         prompt: str,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        num_inference_steps: Optional[int] = None,
-        seed: Optional[int] = None,
-        guidance_scale: Optional[float] = None,
+        width: int | None = None,
+        height: int | None = None,
+        num_inference_steps: int | None = None,
+        seed: int | None = None,
+        guidance_scale: float | None = None,
     ) -> Image.Image:
         """
         Generate an image from a text prompt.
@@ -118,7 +121,9 @@ class ImageGenerator:
         width = width or self.config.default_width
         height = height or self.config.default_height
         num_inference_steps = num_inference_steps or self.config.num_inference_steps
-        guidance_scale = guidance_scale if guidance_scale is not None else self.config.guidance_scale
+        guidance_scale = (
+            guidance_scale if guidance_scale is not None else self.config.guidance_scale
+        )
 
         # Validate guidance_scale for Turbo models
         if guidance_scale != 0.0:
@@ -158,12 +163,12 @@ class ImageGenerator:
     def generate_and_save(
         self,
         prompt: str,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        num_inference_steps: Optional[int] = None,
-        seed: Optional[int] = None,
-        guidance_scale: Optional[float] = None,
-        output_path: Optional[Path] = None,
+        width: int | None = None,
+        height: int | None = None,
+        num_inference_steps: int | None = None,
+        seed: int | None = None,
+        guidance_scale: float | None = None,
+        output_path: Path | None = None,
     ) -> tuple[Image.Image, Path]:
         """
         Generate an image and save it to disk.
@@ -184,7 +189,9 @@ class ImageGenerator:
         width = width or self.config.default_width
         height = height or self.config.default_height
         num_inference_steps = num_inference_steps or self.config.num_inference_steps
-        guidance_scale = guidance_scale if guidance_scale is not None else self.config.guidance_scale
+        guidance_scale = (
+            guidance_scale if guidance_scale is not None else self.config.guidance_scale
+        )
 
         # Build params dict for plugins
         params = {

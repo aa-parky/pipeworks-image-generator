@@ -73,9 +73,7 @@ class CityMapWorkflow(WorkflowBase):
 
         # Map style directive
         if map_style == "fantasy map":
-            prompt_parts.append(
-                "fantasy map style, hand-drawn, parchment, cartographic details"
-            )
+            prompt_parts.append("fantasy map style, hand-drawn, parchment, cartographic details")
         elif map_style == "blueprint":
             prompt_parts.append("architectural blueprint, technical drawing, clean lines")
         elif map_style == "satellite view":

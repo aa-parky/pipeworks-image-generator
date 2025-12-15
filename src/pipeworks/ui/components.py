@@ -1,9 +1,8 @@
 """Reusable UI components for Pipeworks Gradio interface."""
 
-from typing import List, Tuple
 import gradio as gr
 
-from .models import SegmentConfig, SEGMENT_MODES
+from .models import SEGMENT_MODES, SegmentConfig
 
 
 class SegmentUI:
@@ -22,7 +21,7 @@ class SegmentUI:
     - Mode-specific inputs (line numbers, ranges, counts)
     """
 
-    def __init__(self, name: str, initial_choices: List[str]):
+    def __init__(self, name: str, initial_choices: list[str]):
         """Initialize a segment UI component.
 
         Args:
@@ -36,24 +35,14 @@ class SegmentUI:
             self.title = gr.Markdown(f"**{name} Segment**")
 
             # Text input for manual text entry
-            self.text = gr.Textbox(
-                label=f"{name} Text",
-                placeholder="Optional text...",
-                lines=1
-            )
+            self.text = gr.Textbox(label=f"{name} Text", placeholder="Optional text...", lines=1)
 
             # Current path display (shows where user is in folder hierarchy)
-            self.path_display = gr.Textbox(
-                label="Current Path",
-                value="/inputs",
-                interactive=False
-            )
+            self.path_display = gr.Textbox(label="Current Path", value="/inputs", interactive=False)
 
             # File/folder browser dropdown
             self.file = gr.Dropdown(
-                label="File/Folder Browser",
-                choices=initial_choices,
-                value="(None)"
+                label="File/Folder Browser", choices=initial_choices, value="(None)"
             )
 
             # Hidden state to track current navigation path
@@ -61,43 +50,24 @@ class SegmentUI:
 
             # Mode and dynamic options
             with gr.Row():
-                self.mode = gr.Dropdown(
-                    label="Mode",
-                    choices=SEGMENT_MODES,
-                    value="Random Line"
-                )
+                self.mode = gr.Dropdown(label="Mode", choices=SEGMENT_MODES, value="Random Line")
                 self.dynamic = gr.Checkbox(
-                    label="Dynamic",
-                    value=False,
-                    info="Rebuild this segment for each image"
+                    label="Dynamic", value=False, info="Rebuild this segment for each image"
                 )
 
             # Mode-specific inputs (visibility controlled by mode selection)
             with gr.Row():
                 self.line = gr.Number(
-                    label="Line #",
-                    value=1,
-                    minimum=1,
-                    precision=0,
-                    visible=False
+                    label="Line #", value=1, minimum=1, precision=0, visible=False
                 )
                 self.range_end = gr.Number(
-                    label="End Line #",
-                    value=1,
-                    minimum=1,
-                    precision=0,
-                    visible=False
+                    label="End Line #", value=1, minimum=1, precision=0, visible=False
                 )
                 self.count = gr.Number(
-                    label="Count",
-                    value=1,
-                    minimum=1,
-                    maximum=10,
-                    precision=0,
-                    visible=False
+                    label="Count", value=1, minimum=1, maximum=10, precision=0, visible=False
                 )
 
-    def get_all_components(self) -> List[gr.components.Component]:
+    def get_all_components(self) -> list[gr.components.Component]:
         """Return all Gradio components in this segment.
 
         Returns:
@@ -113,10 +83,10 @@ class SegmentUI:
             self.dynamic,
             self.line,
             self.range_end,
-            self.count
+            self.count,
         ]
 
-    def get_input_components(self) -> List[gr.components.Component]:
+    def get_input_components(self) -> list[gr.components.Component]:
         """Return components used as function inputs.
 
         Returns:
@@ -130,23 +100,18 @@ class SegmentUI:
             self.line,
             self.range_end,
             self.count,
-            self.dynamic
+            self.dynamic,
         ]
 
-    def get_output_components(self) -> List[gr.components.Component]:
+    def get_output_components(self) -> list[gr.components.Component]:
         """Return components used as function outputs.
 
         Returns:
             List of components that can be updated by handlers
         """
-        return [
-            self.title,
-            self.path_display,
-            self.file,
-            self.path_state
-        ]
+        return [self.title, self.path_display, self.file, self.path_state]
 
-    def get_navigation_components(self) -> Tuple[gr.Dropdown, gr.State, gr.Textbox]:
+    def get_navigation_components(self) -> tuple[gr.Dropdown, gr.State, gr.Textbox]:
         """Return components needed for file browser navigation.
 
         Returns:
@@ -154,7 +119,7 @@ class SegmentUI:
         """
         return self.file, self.path_state, self.path_display
 
-    def get_mode_visibility_outputs(self) -> Tuple[gr.Number, gr.Number, gr.Number]:
+    def get_mode_visibility_outputs(self) -> tuple[gr.Number, gr.Number, gr.Number]:
         """Return components that change visibility based on mode.
 
         Returns:
@@ -171,7 +136,7 @@ class SegmentUI:
         line: int,
         range_end: int,
         count: int,
-        dynamic: bool
+        dynamic: bool,
     ) -> SegmentConfig:
         """Convert UI component values to SegmentConfig dataclass.
 
@@ -196,7 +161,7 @@ class SegmentUI:
             line=int(line) if line else 1,
             range_end=int(range_end) if range_end else 1,
             count=int(count) if count else 1,
-            dynamic=dynamic
+            dynamic=dynamic,
         )
 
     @staticmethod
@@ -227,7 +192,7 @@ class SegmentUI:
             return f"**{name}**"
 
 
-def update_mode_visibility(mode: str) -> Tuple[gr.Number, gr.Number, gr.Number]:
+def update_mode_visibility(mode: str) -> tuple[gr.Number, gr.Number, gr.Number]:
     """Update visibility of line number inputs based on selected mode.
 
     Args:
@@ -243,7 +208,7 @@ def update_mode_visibility(mode: str) -> Tuple[gr.Number, gr.Number, gr.Number]:
     )
 
 
-def create_three_segments(initial_choices: List[str]) -> Tuple[SegmentUI, SegmentUI, SegmentUI]:
+def create_three_segments(initial_choices: list[str]) -> tuple[SegmentUI, SegmentUI, SegmentUI]:
     """Create the three segment UI components (Start, Middle, End).
 
     Args:

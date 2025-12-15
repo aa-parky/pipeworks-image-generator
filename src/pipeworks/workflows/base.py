@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class WorkflowBase(ABC):
         """
         pass
 
-    def get_generation_params(self, **kwargs) -> Dict[str, Any]:
+    def get_generation_params(self, **kwargs) -> dict[str, Any]:
         """
         Get generation parameters for this workflow.
 
@@ -70,7 +70,7 @@ class WorkflowBase(ABC):
             "seed": kwargs.get("seed"),
         }
 
-    def preprocess(self, **kwargs) -> Dict[str, Any]:
+    def preprocess(self, **kwargs) -> dict[str, Any]:
         """
         Preprocess inputs before generation (optional override).
 
@@ -127,7 +127,7 @@ class WorkflowBase(ABC):
 
         return image, params
 
-    def get_ui_controls(self) -> Dict[str, Any]:
+    def get_ui_controls(self) -> dict[str, Any]:
         """
         Define workflow-specific UI controls for Gradio.
 
@@ -141,10 +141,10 @@ class WorkflowRegistry:
     """Registry for managing available workflows."""
 
     def __init__(self):
-        self._workflows: Dict[str, Type[WorkflowBase]] = {}
-        self._instances: Dict[str, WorkflowBase] = {}
+        self._workflows: dict[str, type[WorkflowBase]] = {}
+        self._instances: dict[str, WorkflowBase] = {}
 
-    def register(self, workflow_class: Type[WorkflowBase]) -> None:
+    def register(self, workflow_class: type[WorkflowBase]) -> None:
         """
         Register a workflow class.
 
@@ -155,9 +155,7 @@ class WorkflowRegistry:
         self._workflows[workflow_name] = workflow_class
         logger.info(f"Registered workflow: {workflow_name}")
 
-    def instantiate(
-        self, workflow_name: str, generator=None
-    ) -> Optional[WorkflowBase]:
+    def instantiate(self, workflow_name: str, generator=None) -> WorkflowBase | None:
         """
         Create an instance of a registered workflow.
 
@@ -176,7 +174,7 @@ class WorkflowRegistry:
         self._instances[workflow_name] = instance
         return instance
 
-    def get_instance(self, workflow_name: str) -> Optional[WorkflowBase]:
+    def get_instance(self, workflow_name: str) -> WorkflowBase | None:
         """Get an existing workflow instance."""
         return self._instances.get(workflow_name)
 
@@ -184,7 +182,7 @@ class WorkflowRegistry:
         """List all registered workflow names."""
         return list(self._workflows.keys())
 
-    def get_workflow_info(self, workflow_name: str) -> Optional[Dict[str, str]]:
+    def get_workflow_info(self, workflow_name: str) -> dict[str, str] | None:
         """Get information about a workflow."""
         if workflow_name not in self._workflows:
             return None

@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from PIL import Image
 
@@ -36,7 +36,7 @@ class SaveMetadataPlugin(PluginBase):
         self.filename_prefix = config.get("filename_prefix", "")
 
     def on_before_save(
-        self, image: Image.Image, save_path: Path, params: Dict[str, Any]
+        self, image: Image.Image, save_path: Path, params: dict[str, Any]
     ) -> tuple[Image.Image, Path]:
         """
         Modify the save path to use the metadata folder if configured.
@@ -60,9 +60,7 @@ class SaveMetadataPlugin(PluginBase):
         logger.info(f"Redirecting save to: {new_save_path}")
         return image, new_save_path
 
-    def on_after_save(
-        self, image: Image.Image, save_path: Path, params: Dict[str, Any]
-    ) -> None:
+    def on_after_save(self, image: Image.Image, save_path: Path, params: dict[str, Any]) -> None:
         """
         Save metadata files after the image has been saved.
 

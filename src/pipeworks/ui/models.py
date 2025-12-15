@@ -1,8 +1,8 @@
 """Data models for Pipeworks UI state and parameters."""
 
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
 import logging
+from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,7 @@ class SegmentConfig:
     This represents the state of one segment in the prompt builder,
     including text input, file selection, and mode settings.
     """
+
     text: str = ""
     path: str = ""
     file: str = "(None)"
@@ -47,6 +48,7 @@ class GenerationParams:
     This dataclass encapsulates all the parameters needed for generating
     images, with built-in validation logic.
     """
+
     prompt: str
     width: int
     height: int
@@ -74,8 +76,7 @@ class GenerationParams:
         total = self.batch_size * self.runs
         if total > 1000:
             raise ValueError(
-                f"Total images ({total}) exceeds maximum of 1000. "
-                f"Reduce batch size or runs."
+                f"Total images ({total}) exceeds maximum of 1000. " f"Reduce batch size or runs."
             )
 
         # Validate dimensions are multiples of 64
@@ -112,10 +113,11 @@ class UIState:
     per user session. Each user gets their own UIState instance to ensure
     thread safety and isolation.
     """
-    generator: Optional[Any] = None  # ImageGenerator instance
-    tokenizer_analyzer: Optional[Any] = None  # TokenizerAnalyzer instance
-    prompt_builder: Optional[Any] = None  # PromptBuilder instance
-    active_plugins: Dict[str, Any] = field(default_factory=dict)  # Dict[str, PluginBase]
+
+    generator: Any | None = None  # ImageGenerator instance
+    tokenizer_analyzer: Any | None = None  # TokenizerAnalyzer instance
+    prompt_builder: Any | None = None  # PromptBuilder instance
+    active_plugins: dict[str, Any] = field(default_factory=dict)  # Dict[str, PluginBase]
 
     def is_initialized(self) -> bool:
         """Check if the state has been initialized with core components.
@@ -132,19 +134,12 @@ class UIState:
     def __repr__(self) -> str:
         """String representation for debugging."""
         return (
-            f"UIState(initialized={self.is_initialized()}, "
-            f"plugins={len(self.active_plugins)})"
+            f"UIState(initialized={self.is_initialized()}, " f"plugins={len(self.active_plugins)})"
         )
 
 
 # Constants for UI
-SEGMENT_MODES = [
-    "Random Line",
-    "Specific Line",
-    "Line Range",
-    "All Lines",
-    "Random Multiple"
-]
+SEGMENT_MODES = ["Random Line", "Specific Line", "Line Range", "All Lines", "Random Multiple"]
 
 ASPECT_RATIOS = {
     "Square 1:1 (1024x1024)": (1024, 1024),

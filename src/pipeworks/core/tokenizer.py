@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +9,7 @@ logger = logging.getLogger(__name__)
 class TokenizerAnalyzer:
     """Lightweight tokenizer analyzer for Z-Image-Turbo prompts."""
 
-    def __init__(self, model_id: str = "Tongyi-MAI/Z-Image-Turbo", cache_dir: Optional[Path] = None):
+    def __init__(self, model_id: str = "Tongyi-MAI/Z-Image-Turbo", cache_dir: Path | None = None):
         """
         Initialize the tokenizer analyzer.
 
@@ -45,7 +44,7 @@ class TokenizerAnalyzer:
             logger.error(f"Failed to load tokenizer: {e}")
             raise
 
-    def analyze(self, text: str) -> Dict[str, any]:
+    def analyze(self, text: str) -> dict[str, any]:
         """
         Analyze a text prompt and return tokenization details.
 
@@ -92,7 +91,7 @@ class TokenizerAnalyzer:
             "special_tokens": special_tokens,
         }
 
-    def format_tokens(self, tokens: List[str]) -> str:
+    def format_tokens(self, tokens: list[str]) -> str:
         """
         Format tokens for display with visual separators.
 
@@ -105,7 +104,7 @@ class TokenizerAnalyzer:
         # Use | as separator and wrap each token
         return " | ".join([f"'{token}'" for token in tokens])
 
-    def get_info(self) -> Dict[str, any]:
+    def get_info(self) -> dict[str, any]:
         """
         Get tokenizer information.
 

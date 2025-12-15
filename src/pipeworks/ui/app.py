@@ -2,33 +2,27 @@
 
 import logging
 import random
-from typing import List, Tuple
 from pathlib import Path
 
 import gradio as gr
 
 from pipeworks.core.config import config
-from pipeworks.plugins.base import plugin_registry
+
 # Import all plugins to ensure they're registered
-from pipeworks.plugins import SaveMetadataPlugin
+from pipeworks.plugins.base import plugin_registry
+
+from .components import SegmentUI, create_three_segments, update_mode_visibility
 
 # Import new refactored modules
-from .models import (
-    GenerationParams,
-    SegmentConfig,
-    UIState,
-    ASPECT_RATIOS,
-    MAX_SEED,
-    DEFAULT_SEED
-)
-from .components import SegmentUI, update_mode_visibility, create_three_segments
+from .models import ASPECT_RATIOS, DEFAULT_SEED, MAX_SEED, GenerationParams, SegmentConfig, UIState
+from .state import initialize_ui_state
+from .state import toggle_plugin as toggle_plugin_state
 from .validation import (
     ValidationError,
     validate_generation_params,
+    validate_prompt_content,
     validate_segments,
-    validate_prompt_content
 )
-from .state import initialize_ui_state, toggle_plugin as toggle_plugin_state
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +32,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def set_aspect_ratio(ratio_name: str) -> Tuple[gr.Number, gr.Number]:
+def set_aspect_ratio(ratio_name: str) -> tuple[gr.Number, gr.Number]:
     """Set width and height based on aspect ratio preset.
 
     Args:
@@ -57,7 +51,7 @@ def set_aspect_ratio(ratio_name: str) -> Tuple[gr.Number, gr.Number]:
     return gr.update(value=width), gr.update(value=height)
 
 
-def analyze_prompt(prompt: str, state: UIState) -> Tuple[str, UIState]:
+def analyze_prompt(prompt: str, state: UIState) -> tuple[str, UIState]:
     """Analyze prompt tokenization and return formatted results.
 
     Args:
@@ -103,7 +97,7 @@ def analyze_prompt(prompt: str, state: UIState) -> Tuple[str, UIState]:
         return f"*Error analyzing prompt: {str(e)}*", state
 
 
-def get_items_in_path(current_path: str, state: UIState) -> Tuple[gr.Dropdown, str, UIState]:
+def get_items_in_path(current_path: str, state: UIState) -> tuple[gr.Dropdown, str, UIState]:
     """Get folders and files at the current path level.
 
     Args:
@@ -139,10 +133,8 @@ def get_items_in_path(current_path: str, state: UIState) -> Tuple[gr.Dropdown, s
 
 
 def navigate_file_selection(
-    selected: str,
-    current_path: str,
-    state: UIState
-) -> Tuple[gr.Dropdown, str, UIState]:
+    selected: str, current_path: str, state: UIState
+) -> tuple[gr.Dropdown, str, UIState]:
     """Handle folder navigation when an item is selected.
 
     Args:
@@ -183,10 +175,7 @@ def navigate_file_selection(
 
 
 def build_combined_prompt(
-    start: SegmentConfig,
-    middle: SegmentConfig,
-    end: SegmentConfig,
-    state: UIState
+    start: SegmentConfig, middle: SegmentConfig, end: SegmentConfig, state: UIState
 ) -> str:
     """Build a combined prompt from multiple segments.
 
@@ -253,8 +242,8 @@ def generate_image(
     start: SegmentConfig,
     middle: SegmentConfig,
     end: SegmentConfig,
-    state: UIState
-) -> Tuple[List[str], str, str, UIState]:
+    state: UIState,
+) -> tuple[list[str], str, str, UIState]:
     """Generate image(s) from the UI inputs.
 
     Args:
@@ -287,7 +276,7 @@ def generate_image(
             batch_size=batch_size,
             runs=runs,
             seed=seed,
-            use_random_seed=use_random_seed
+            use_random_seed=use_random_seed,
         )
 
         # Validate generation parameters
@@ -353,12 +342,9 @@ def generate_image(
                 logger.info(f"Image {image_num}/{params.total_images} complete: {save_path}")
 
         # Create info text
-        active_plugin_names = [
-            p.name for p in state.generator.plugins if p.enabled
-        ]
+        active_plugin_names = [p.name for p in state.generator.plugins if p.enabled]
         plugins_info = (
-            f"\n**Active Plugins:** {', '.join(active_plugin_names)}"
-            if active_plugin_names else ""
+            f"\n**Active Plugins:** {', '.join(active_plugin_names)}" if active_plugin_names else ""
         )
 
         # Format seeds display
@@ -403,16 +389,16 @@ def generate_image(
     except Exception as e:
         # Unexpected error
         logger.error(f"Error generating image: {e}", exc_info=True)
-        error_msg = f"❌ **Error**\n\nAn unexpected error occurred. Check logs for details.\n\n`{str(e)}`"
+        error_msg = (
+            f"❌ **Error**\n\nAn unexpected error occurred. "
+            f"Check logs for details.\n\n`{str(e)}`"
+        )
         return [], error_msg, str(seed), state
 
 
 def toggle_plugin_ui(
-    plugin_name: str,
-    enabled: bool,
-    state: UIState,
-    **plugin_config
-) -> Tuple[gr.Group, UIState]:
+    plugin_name: str, enabled: bool, state: UIState, **plugin_config
+) -> tuple[gr.Group, UIState]:
     """Toggle a plugin on/off and update its configuration.
 
     Args:
@@ -482,6 +468,7 @@ def create_ui() -> gr.Blocks:
                     initial_choices = ["(None)"]
                     try:
                         from pipeworks.core.prompt_builder import PromptBuilder
+
                         temp_pb = PromptBuilder(config.inputs_dir)
                         folders, files = temp_pb.get_items_in_path("")
                         for folder in folders:
@@ -501,8 +488,7 @@ def create_ui() -> gr.Blocks:
                 # Tokenizer Analyzer
                 with gr.Accordion("Tokenizer Analyzer", open=False):
                     tokenizer_output = gr.Markdown(
-                        value="*Enter a prompt to see tokenization analysis*",
-                        label="Analysis"
+                        value="*Enter a prompt to see tokenization analysis*", label="Analysis"
                     )
 
                 # Aspect Ratio Preset Selector
@@ -599,13 +585,18 @@ def create_ui() -> gr.Blocks:
                                     enabled,
                                     state,
                                     folder_name=folder,
-                                    filename_prefix=prefix
+                                    filename_prefix=prefix,
                                 )
                                 return vis_update, new_state
 
                             save_metadata_check.change(
                                 fn=toggle_save_metadata,
-                                inputs=[save_metadata_check, metadata_folder, metadata_prefix, ui_state],
+                                inputs=[
+                                    save_metadata_check,
+                                    metadata_folder,
+                                    metadata_prefix,
+                                    ui_state,
+                                ],
                                 outputs=[metadata_settings, ui_state],
                             )
 
@@ -617,19 +608,29 @@ def create_ui() -> gr.Blocks:
                                         enabled,
                                         state,
                                         folder_name=folder,
-                                        filename_prefix=prefix
+                                        filename_prefix=prefix,
                                     )
                                     return new_state
                                 return state
 
                             metadata_folder.change(
                                 fn=update_plugin_config,
-                                inputs=[save_metadata_check, metadata_folder, metadata_prefix, ui_state],
+                                inputs=[
+                                    save_metadata_check,
+                                    metadata_folder,
+                                    metadata_prefix,
+                                    ui_state,
+                                ],
                                 outputs=[ui_state],
                             )
                             metadata_prefix.change(
                                 fn=update_plugin_config,
-                                inputs=[save_metadata_check, metadata_folder, metadata_prefix, ui_state],
+                                inputs=[
+                                    save_metadata_check,
+                                    metadata_folder,
+                                    metadata_prefix,
+                                    ui_state,
+                                ],
                                 outputs=[ui_state],
                             )
 
@@ -669,7 +670,8 @@ def create_ui() -> gr.Blocks:
         gr.Markdown(
             f"""
             ---
-            **Model:** {config.model_id} | **Device:** {config.device} | **Dtype:** {config.torch_dtype}
+            **Model:** {config.model_id} | **Device:** {config.device} |
+            **Dtype:** {config.torch_dtype}
 
             *Outputs saved to: {config.outputs_dir}*
             """
@@ -725,18 +727,22 @@ def create_ui() -> gr.Blocks:
                 prompt = f"Error: {str(e)}"
 
             # Update titles with status
-            start_title = SegmentUI.format_title("Start", start_cfg.file, start_cfg.mode, start_cfg.dynamic)
-            middle_title = SegmentUI.format_title("Middle", middle_cfg.file, middle_cfg.mode, middle_cfg.dynamic)
+            start_title = SegmentUI.format_title(
+                "Start", start_cfg.file, start_cfg.mode, start_cfg.dynamic
+            )
+            middle_title = SegmentUI.format_title(
+                "Middle", middle_cfg.file, middle_cfg.mode, middle_cfg.dynamic
+            )
             end_title = SegmentUI.format_title("End", end_cfg.file, end_cfg.mode, end_cfg.dynamic)
 
             return prompt, start_title, middle_title, end_title, state
 
         # Collect all segment inputs
         all_segment_inputs = (
-            start_segment.get_input_components() +
-            middle_segment.get_input_components() +
-            end_segment.get_input_components() +
-            [ui_state]
+            start_segment.get_input_components()
+            + middle_segment.get_input_components()
+            + end_segment.get_input_components()
+            + [ui_state]
         )
 
         build_prompt_btn.click(
@@ -747,7 +753,7 @@ def create_ui() -> gr.Blocks:
                 start_segment.title,
                 middle_segment.title,
                 end_segment.title,
-                ui_state
+                ui_state,
             ],
         )
 
@@ -798,8 +804,18 @@ def create_ui() -> gr.Blocks:
 
             # Call generate_image with clean parameters
             return generate_image(
-                prompt, width, height, num_steps, batch_size, runs, seed, use_random_seed,
-                start_cfg, middle_cfg, end_cfg, state
+                prompt,
+                width,
+                height,
+                num_steps,
+                batch_size,
+                runs,
+                seed,
+                use_random_seed,
+                start_cfg,
+                middle_cfg,
+                end_cfg,
+                state,
             )
 
         # Collect all inputs for generation
@@ -835,9 +851,7 @@ def main():
     # Create and launch UI
     app = create_ui()
 
-    logger.info(
-        f"Launching Gradio UI on {config.gradio_server_name}:{config.gradio_server_port}"
-    )
+    logger.info(f"Launching Gradio UI on {config.gradio_server_name}:{config.gradio_server_port}")
 
     app.launch(
         server_name=config.gradio_server_name,

@@ -3,7 +3,6 @@
 import logging
 import random
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class PromptBuilder:
         self.inputs_dir = Path(inputs_dir)
         self._file_cache = {}  # Cache file contents
 
-    def scan_text_files(self) -> List[str]:
+    def scan_text_files(self) -> list[str]:
         """
         Scan inputs directory for .txt files.
 
@@ -40,7 +39,7 @@ class PromptBuilder:
 
         return sorted(txt_files)
 
-    def scan_folders(self) -> List[str]:
+    def scan_folders(self) -> list[str]:
         """
         Scan inputs directory for folders containing .txt files.
 
@@ -68,7 +67,7 @@ class PromptBuilder:
 
         return sorted(list(folders))
 
-    def get_items_in_path(self, path: str = "") -> Tuple[List[str], List[str]]:
+    def get_items_in_path(self, path: str = "") -> tuple[list[str], list[str]]:
         """
         Get folders and files at a specific path level (non-recursive).
 
@@ -101,7 +100,7 @@ class PromptBuilder:
 
         return folders, files
 
-    def get_files_in_folder(self, folder: str) -> List[str]:
+    def get_files_in_folder(self, folder: str) -> list[str]:
         """
         Get all .txt files in a specific folder.
 
@@ -152,7 +151,7 @@ class PromptBuilder:
         # Combine folder path and filename
         return f"{folder}/{filename}" if folder else filename
 
-    def read_file_lines(self, file_path: str) -> List[str]:
+    def read_file_lines(self, file_path: str) -> list[str]:
         """
         Read lines from a text file.
 
@@ -172,7 +171,7 @@ class PromptBuilder:
             return []
 
         try:
-            with open(full_path, "r", encoding="utf-8") as f:
+            with open(full_path, encoding="utf-8") as f:
                 lines = [line.strip() for line in f.readlines() if line.strip()]
 
             # Cache the result
@@ -270,7 +269,7 @@ class PromptBuilder:
         selected = random.sample(lines, count)
         return ", ".join(selected)
 
-    def build_prompt(self, segments: List[Tuple[str, str]]) -> str:
+    def build_prompt(self, segments: list[tuple[str, str]]) -> str:
         """
         Build a prompt from a list of segments.
 

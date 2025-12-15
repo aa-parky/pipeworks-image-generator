@@ -1,9 +1,9 @@
 """Base classes and registry for the Pipeworks plugin system."""
 
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from PIL import Image
 
@@ -36,7 +36,7 @@ class PluginBase(ABC):
         self.enabled = True
         logger.info(f"Initialized plugin: {self.name}")
 
-    def on_generate_start(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def on_generate_start(self, params: dict[str, Any]) -> dict[str, Any]:
         """
         Called before generation starts.
 
@@ -48,9 +48,7 @@ class PluginBase(ABC):
         """
         return params
 
-    def on_generate_complete(
-        self, image: Image.Image, params: Dict[str, Any]
-    ) -> Image.Image:
+    def on_generate_complete(self, image: Image.Image, params: dict[str, Any]) -> Image.Image:
         """
         Called after generation completes but before saving.
 
@@ -64,7 +62,7 @@ class PluginBase(ABC):
         return image
 
     def on_before_save(
-        self, image: Image.Image, save_path: Path, params: Dict[str, Any]
+        self, image: Image.Image, save_path: Path, params: dict[str, Any]
     ) -> tuple[Image.Image, Path]:
         """
         Called before saving the image.
@@ -79,9 +77,7 @@ class PluginBase(ABC):
         """
         return image, save_path
 
-    def on_after_save(
-        self, image: Image.Image, save_path: Path, params: Dict[str, Any]
-    ) -> None:
+    def on_after_save(self, image: Image.Image, save_path: Path, params: dict[str, Any]) -> None:
         """
         Called after the image has been saved.
 
@@ -107,10 +103,10 @@ class PluginRegistry:
     """Registry for managing available plugins."""
 
     def __init__(self):
-        self._plugins: Dict[str, Type[PluginBase]] = {}
-        self._instances: Dict[str, PluginBase] = {}
+        self._plugins: dict[str, type[PluginBase]] = {}
+        self._instances: dict[str, PluginBase] = {}
 
-    def register(self, plugin_class: Type[PluginBase]) -> None:
+    def register(self, plugin_class: type[PluginBase]) -> None:
         """
         Register a plugin class.
 
@@ -121,9 +117,7 @@ class PluginRegistry:
         self._plugins[plugin_name] = plugin_class
         logger.info(f"Registered plugin: {plugin_name}")
 
-    def instantiate(
-        self, plugin_name: str, **config
-    ) -> Optional[PluginBase]:
+    def instantiate(self, plugin_name: str, **config) -> PluginBase | None:
         """
         Create an instance of a registered plugin.
 
@@ -142,7 +136,7 @@ class PluginRegistry:
         self._instances[plugin_name] = instance
         return instance
 
-    def get_instance(self, plugin_name: str) -> Optional[PluginBase]:
+    def get_instance(self, plugin_name: str) -> PluginBase | None:
         """Get an existing plugin instance."""
         return self._instances.get(plugin_name)
 

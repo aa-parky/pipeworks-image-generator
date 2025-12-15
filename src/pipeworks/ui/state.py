@@ -1,20 +1,18 @@
 """State management utilities for Pipeworks UI."""
 
 import logging
-from typing import Optional
 
 from pipeworks.core.config import config
 from pipeworks.core.pipeline import ImageGenerator
-from pipeworks.core.tokenizer import TokenizerAnalyzer
 from pipeworks.core.prompt_builder import PromptBuilder
-from pipeworks.plugins.base import PluginBase
+from pipeworks.core.tokenizer import TokenizerAnalyzer
 
 from .models import UIState
 
 logger = logging.getLogger(__name__)
 
 
-def initialize_ui_state(state: Optional[UIState] = None) -> UIState:
+def initialize_ui_state(state: UIState | None = None) -> UIState:
     """Initialize or ensure UI state is ready.
 
     This function handles lazy initialization of the UI state components.
@@ -56,8 +54,7 @@ def initialize_ui_state(state: Optional[UIState] = None) -> UIState:
         if state.tokenizer_analyzer is None:
             logger.info("Initializing TokenizerAnalyzer")
             state.tokenizer_analyzer = TokenizerAnalyzer(
-                model_id=config.model_id,
-                cache_dir=config.models_dir
+                model_id=config.model_id, cache_dir=config.models_dir
             )
             state.tokenizer_analyzer.load()
             logger.info("TokenizerAnalyzer loaded successfully")
@@ -90,10 +87,7 @@ def update_generator_plugins(state: UIState) -> UIState:
         return state
 
     # Get list of enabled plugins
-    enabled_plugins = [
-        plugin for plugin in state.active_plugins.values()
-        if plugin.enabled
-    ]
+    enabled_plugins = [plugin for plugin in state.active_plugins.values() if plugin.enabled]
 
     # Update generator's plugin list
     state.generator.plugins = enabled_plugins
@@ -102,12 +96,7 @@ def update_generator_plugins(state: UIState) -> UIState:
     return state
 
 
-def toggle_plugin(
-    state: UIState,
-    plugin_name: str,
-    enabled: bool,
-    **plugin_config
-) -> UIState:
+def toggle_plugin(state: UIState, plugin_name: str, enabled: bool, **plugin_config) -> UIState:
     """Toggle a plugin on/off and update its configuration.
 
     Args:
@@ -125,8 +114,7 @@ def toggle_plugin(
         # Instantiate plugin with new config
         logger.info(f"Enabling plugin: {plugin_name} with config: {plugin_config}")
         state.active_plugins[plugin_name] = plugin_registry.instantiate(
-            plugin_name,
-            **plugin_config
+            plugin_name, **plugin_config
         )
     else:
         # Disable the plugin

@@ -1,8 +1,7 @@
 """Validation utilities for Pipeworks UI inputs."""
 
-from pathlib import Path
-from typing import Tuple
 import logging
+from pathlib import Path
 
 from .models import GenerationParams, SegmentConfig
 
@@ -15,6 +14,7 @@ class ValidationError(Exception):
     This exception is raised when user input fails validation.
     The message is intended to be displayed directly to the user.
     """
+
     pass
 
 
@@ -90,9 +90,7 @@ def validate_segment_path(path: str, file: str, base_dir: Path) -> Path:
 
 
 def validate_segments(
-    segments: Tuple[SegmentConfig, SegmentConfig, SegmentConfig],
-    base_dir: Path,
-    prompt: str
+    segments: tuple[SegmentConfig, SegmentConfig, SegmentConfig], base_dir: Path, prompt: str
 ) -> None:
     """Validate all segment configurations.
 
@@ -137,9 +135,7 @@ def validate_segments(
 
     # If dynamic segments are used, ensure at least one segment is configured
     if has_dynamic:
-        has_configured_dynamic = any(
-            seg.dynamic and seg.is_configured() for seg in segments
-        )
+        has_configured_dynamic = any(seg.dynamic and seg.is_configured() for seg in segments)
         if not has_configured_dynamic:
             raise ValidationError(
                 "Dynamic mode is enabled but no segments have files configured. "
@@ -180,7 +176,7 @@ def sanitize_filename_input(text: str) -> str:
     # Remove potentially problematic characters
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
-        text = text.replace(char, '_')
+        text = text.replace(char, "_")
 
     # Limit length
     return text[:100]
