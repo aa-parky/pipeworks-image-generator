@@ -34,11 +34,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_ui() -> gr.Blocks:
+def create_ui() -> tuple[gr.Blocks, str]:
     """Create the Gradio UI with refactored architecture.
 
     Returns:
-        Gradio Blocks app
+        Tuple of (Gradio Blocks app, custom CSS string)
     """
     # Custom CSS for plugin section
     custom_css = """
@@ -51,7 +51,7 @@ def create_ui() -> gr.Blocks:
     }
     """
 
-    app = gr.Blocks(title="Pipeworks Image Generator", css=custom_css)
+    app = gr.Blocks(title="Pipeworks Image Generator")
 
     with app:
         # Session state - one instance per user
@@ -65,15 +65,27 @@ def create_ui() -> gr.Blocks:
         )
 
         with gr.Tabs():
-            with gr.Tab("Generate"):
+            with gr.Tab("Generate", id="generate_tab"):
                 # Main generation UI
                 create_generation_tab(ui_state)
 
-            with gr.Tab("Gallery Browser"):
+            with gr.Tab("Gallery Browser", id="gallery_tab") as gallery_tab:
                 # Gallery browser UI
-                create_gallery_tab(ui_state)
+                gallery_components = create_gallery_tab(ui_state)
 
-    return app
+                # Initialize gallery when tab is selected
+                gallery_tab.select(
+                    fn=initialize_gallery_browser,
+                    inputs=[ui_state],
+                    outputs=[
+                        gallery_components["folder_dropdown"],
+                        gallery_components["current_path_state"],
+                        gallery_components["gallery"],
+                        ui_state,
+                    ],
+                )
+
+    return app, custom_css
 
 
 def create_generation_tab(ui_state):
@@ -449,6 +461,9 @@ def create_gallery_tab(ui_state):
 
     Args:
         ui_state: UI state component
+
+    Returns:
+        Dictionary of gallery components for event handling
     """
     gr.Markdown("### Browse Generated Images")
 
@@ -498,17 +513,6 @@ def create_gallery_tab(ui_state):
 
     # Event handlers for gallery browser
 
-    # Initialize gallery on load
-    gallery.load(
-        fn=initialize_gallery_browser,
-        inputs=[ui_state],
-        outputs=[folder_dropdown, current_path_state, gallery, ui_state],
-    ).then(
-        fn=lambda path: f"**Current:** /outputs/{path}" if path else "**Current:** /outputs",
-        inputs=[current_path_state],
-        outputs=[current_path_display],
-    )
-
     # Folder navigation
     folder_dropdown.change(
         fn=load_gallery_folder,
@@ -541,6 +545,13 @@ def create_gallery_tab(ui_state):
         outputs=[gallery, ui_state],
     )
 
+    # Return components for initialization event handler
+    return {
+        "folder_dropdown": folder_dropdown,
+        "current_path_state": current_path_state,
+        "gallery": gallery,
+    }
+
 
 def main():
     """Main entry point for the application."""
@@ -552,7 +563,7 @@ def main():
     logger.info(f"Available plugins: {available_plugins}")
 
     # Create and launch UI
-    app = create_ui()
+    app, custom_css = create_ui()
 
     logger.info(f"Launching Gradio UI on {config.gradio_server_name}:{config.gradio_server_port}")
 
@@ -562,6 +573,7 @@ def main():
         share=config.gradio_share,
         show_error=True,
         inbrowser=False,
+        css=custom_css,
     )
 
 
