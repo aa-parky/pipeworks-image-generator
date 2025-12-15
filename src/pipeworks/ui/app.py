@@ -8,6 +8,7 @@ import gradio as gr
 
 from pipeworks.core.config import config
 from pipeworks.core.pipeline import ImageGenerator
+from pipeworks.core.tokenizer import TokenizerAnalyzer
 from pipeworks.plugins.base import PluginBase, plugin_registry
 # Import all plugins to ensure they're registered
 from pipeworks.plugins import SaveMetadataPlugin
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Global state for plugins
 active_plugins: Dict[str, PluginBase] = {}
 generator: ImageGenerator = None  # Will be initialized with plugins
+tokenizer_analyzer: TokenizerAnalyzer = None  # Will be initialized on startup
 
 
 def update_generator_plugins():
@@ -81,6 +83,59 @@ def set_aspect_ratio(ratio_name: str) -> tuple[int, int]:
 
     width, height = aspect_ratios.get(ratio_name, (config.default_width, config.default_height))
     return gr.update(value=width), gr.update(value=height)
+
+
+def analyze_prompt(prompt: str) -> str:
+    """
+    Analyze prompt tokenization and return formatted results.
+
+    Args:
+        prompt: Text prompt to analyze
+
+    Returns:
+        Formatted markdown string with tokenization details
+    """
+    global tokenizer_analyzer
+
+    if not prompt or prompt.strip() == "":
+        return "*Enter a prompt to see tokenization analysis*"
+
+    try:
+        # Lazy load tokenizer on first use
+        if tokenizer_analyzer is None:
+            tokenizer_analyzer = TokenizerAnalyzer(
+                model_id=config.model_id,
+                cache_dir=config.models_dir
+            )
+            tokenizer_analyzer.load()
+
+        # Analyze the prompt
+        analysis = tokenizer_analyzer.analyze(prompt)
+
+        # Format results
+        token_count = analysis["token_count"]
+        tokens = analysis["tokens"]
+        formatted_tokens = tokenizer_analyzer.format_tokens(tokens)
+
+        # Build markdown output
+        result = f"""
+**Token Count:** {token_count}
+
+**Tokenized Output:**
+```
+{formatted_tokens}
+```
+"""
+
+        if analysis["special_tokens"]:
+            special = ", ".join(analysis["special_tokens"])
+            result += f"\n**Special Tokens Found:** {special}\n"
+
+        return result.strip()
+
+    except Exception as e:
+        logger.error(f"Error analyzing prompt: {e}", exc_info=True)
+        return f"*Error analyzing prompt: {str(e)}*"
 
 
 def generate_image(
@@ -205,6 +260,13 @@ def create_ui() -> tuple[gr.Blocks, str]:
                     lines=3,
                     value="A serene mountain landscape at sunset with vibrant colors",
                 )
+
+                # Tokenizer Analyzer
+                with gr.Accordion("Tokenizer Analyzer", open=False):
+                    tokenizer_output = gr.Markdown(
+                        value="*Enter a prompt to see tokenization analysis*",
+                        label="Analysis"
+                    )
 
                 # Aspect Ratio Preset Selector
                 aspect_ratio_dropdown = gr.Dropdown(
@@ -368,6 +430,20 @@ def create_ui() -> tuple[gr.Blocks, str]:
             fn=set_aspect_ratio,
             inputs=[aspect_ratio_dropdown],
             outputs=[width_slider, height_slider],
+        )
+
+        # Tokenizer analyzer handler (updates on change)
+        prompt_input.change(
+            fn=analyze_prompt,
+            inputs=[prompt_input],
+            outputs=[tokenizer_output],
+        )
+
+        # Trigger analysis on app load with default prompt
+        app.load(
+            fn=analyze_prompt,
+            inputs=[prompt_input],
+            outputs=[tokenizer_output],
         )
 
         generate_btn.click(
