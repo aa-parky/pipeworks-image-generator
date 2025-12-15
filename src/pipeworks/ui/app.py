@@ -163,6 +163,92 @@ def get_files_in_folder(folder: str) -> gr.Dropdown:
     return gr.update(choices=["(None)"] + files, value="(None)" if not files else files[0])
 
 
+def update_segment_titles(
+    start_folder: str,
+    start_file: str,
+    start_mode: str,
+    start_dynamic: bool,
+    middle_folder: str,
+    middle_file: str,
+    middle_mode: str,
+    middle_dynamic: bool,
+    end_folder: str,
+    end_file: str,
+    end_mode: str,
+    end_dynamic: bool,
+) -> tuple[gr.Markdown, gr.Markdown, gr.Markdown]:
+    """Update segment titles with status and configuration."""
+
+    def format_title(name: str, folder: str, file: str, mode: str, dynamic: bool) -> str:
+        # Check if segment is configured
+        has_config = (folder != "(None)" and file != "(None)")
+
+        if has_config:
+            # Green for configured segments
+            parts = [f'<span style="color: #22c55e">**{name}**</span>']
+            parts.append(f'<span style="color: #22c55e">| {mode}</span>')
+            if dynamic:
+                parts.append('<span style="color: #22c55e">| Dynamic</span>')
+            return " ".join(parts)
+        else:
+            # Gray for unconfigured segments
+            return f"**{name}**"
+
+    start_title = format_title("Start Segment", start_folder, start_file, start_mode, start_dynamic)
+    middle_title = format_title("Middle Segment", middle_folder, middle_file, middle_mode, middle_dynamic)
+    end_title = format_title("End Segment", end_folder, end_file, end_mode, end_dynamic)
+
+    return (
+        gr.update(value=start_title),
+        gr.update(value=middle_title),
+        gr.update(value=end_title),
+    )
+
+
+def build_prompt_and_update_titles(
+    start_text: str,
+    start_folder: str,
+    start_file: str,
+    start_mode: str,
+    start_line: int,
+    start_range_end: int,
+    start_count: int,
+    start_dynamic: bool,
+    middle_text: str,
+    middle_folder: str,
+    middle_file: str,
+    middle_mode: str,
+    middle_line: int,
+    middle_range_end: int,
+    middle_count: int,
+    middle_dynamic: bool,
+    end_text: str,
+    end_folder: str,
+    end_file: str,
+    end_mode: str,
+    end_line: int,
+    end_range_end: int,
+    end_count: int,
+    end_dynamic: bool,
+) -> tuple[str, gr.Markdown, gr.Markdown, gr.Markdown]:
+    """Build prompt and update segment titles."""
+    # Build the prompt
+    prompt = build_combined_prompt(
+        start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count,
+        middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count,
+        end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count,
+    )
+
+    # Update titles
+    titles = update_segment_titles(
+        start_folder, start_file, start_mode, start_dynamic,
+        middle_folder, middle_file, middle_mode, middle_dynamic,
+        end_folder, end_file, end_mode, end_dynamic,
+    )
+
+    return (prompt, *titles)
+
+
 def build_combined_prompt(
     start_text: str,
     start_folder: str,
@@ -440,7 +526,7 @@ def create_ui() -> tuple[gr.Blocks, str]:
 
                     # Start Segment
                     with gr.Group():
-                        gr.Markdown("**Start Segment**")
+                        start_segment_title = gr.Markdown("**Start Segment**")
                         start_text = gr.Textbox(label="Start Text", placeholder="Optional text...", lines=1)
                         with gr.Row():
                             start_folder = gr.Dropdown(label="Folder", choices=available_folders, value="(None)")
@@ -463,7 +549,7 @@ def create_ui() -> tuple[gr.Blocks, str]:
 
                     # Middle Segment
                     with gr.Group():
-                        gr.Markdown("**Middle Segment**")
+                        middle_segment_title = gr.Markdown("**Middle Segment**")
                         middle_text = gr.Textbox(label="Middle Text", placeholder="Optional text...", lines=1)
                         with gr.Row():
                             middle_folder = gr.Dropdown(label="Folder", choices=available_folders, value="(None)")
@@ -486,7 +572,7 @@ def create_ui() -> tuple[gr.Blocks, str]:
 
                     # End Segment
                     with gr.Group():
-                        gr.Markdown("**End Segment**")
+                        end_segment_title = gr.Markdown("**End Segment**")
                         end_text = gr.Textbox(label="End Text", placeholder="Optional text...", lines=1)
                         with gr.Row():
                             end_folder = gr.Dropdown(label="Folder", choices=available_folders, value="(None)")
@@ -733,13 +819,13 @@ def create_ui() -> tuple[gr.Blocks, str]:
 
         # Build prompt button handler
         build_prompt_btn.click(
-            fn=build_combined_prompt,
+            fn=build_prompt_and_update_titles,
             inputs=[
-                start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count,
-                middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count,
-                end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count,
+                start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count, start_dynamic,
+                middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count, middle_dynamic,
+                end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count, end_dynamic,
             ],
-            outputs=[prompt_input],
+            outputs=[prompt_input, start_segment_title, middle_segment_title, end_segment_title],
         )
 
         # Aspect ratio preset handler
