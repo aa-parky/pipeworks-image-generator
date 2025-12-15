@@ -68,6 +68,39 @@ class PromptBuilder:
 
         return sorted(list(folders))
 
+    def get_items_in_path(self, path: str = "") -> Tuple[List[str], List[str]]:
+        """
+        Get folders and files at a specific path level (non-recursive).
+
+        Args:
+            path: Relative path from inputs_dir (empty string for root)
+
+        Returns:
+            Tuple of (folders, files) at this level only
+        """
+        if not self.inputs_dir.exists():
+            return [], []
+
+        current_path = self.inputs_dir / path if path else self.inputs_dir
+        if not current_path.exists():
+            return [], []
+
+        folders = []
+        files = []
+
+        try:
+            for item in sorted(current_path.iterdir()):
+                if item.is_dir():
+                    # Only add if directory contains .txt files (directly or in subdirectories)
+                    if any(item.rglob("*.txt")):
+                        folders.append(item.name)
+                elif item.suffix == ".txt":
+                    files.append(item.name)
+        except PermissionError:
+            logger.error(f"Permission denied accessing: {current_path}")
+
+        return folders, files
+
     def get_files_in_folder(self, folder: str) -> List[str]:
         """
         Get all .txt files in a specific folder.
@@ -103,16 +136,21 @@ class PromptBuilder:
         Get the full relative path for a file given folder and filename.
 
         Args:
-            folder: Folder name or "(Root)"
+            folder: Folder name, path, or "(Root)"
             filename: Filename
 
         Returns:
             Full relative path from inputs_dir
         """
-        if folder == "(Root)":
+        if not filename or filename == "(None)":
+            return ""
+
+        # Handle (None) or empty folder
+        if not folder or folder == "(None)" or folder == "(Root)":
             return filename
-        else:
-            return f"{folder}/{filename}"
+
+        # Combine folder path and filename
+        return f"{folder}/{filename}" if folder else filename
 
     def read_file_lines(self, file_path: str) -> List[str]:
         """

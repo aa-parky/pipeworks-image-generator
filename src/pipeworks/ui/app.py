@@ -150,8 +150,87 @@ def get_available_folders() -> List[str]:
     return ["(None)"] + folders
 
 
+def get_items_in_path(current_path: str) -> tuple[gr.Dropdown, str]:
+    """
+    Get folders and files at the current path level (hierarchical navigation).
+
+    Args:
+        current_path: Current path being browsed (empty string for root)
+
+    Returns:
+        Tuple of (updated dropdown, display path)
+    """
+    global prompt_builder
+    if prompt_builder is None:
+        prompt_builder = PromptBuilder(config.inputs_dir)
+
+    folders, files = prompt_builder.get_items_in_path(current_path)
+
+    # Build choices list: folders first (with prefix), then files
+    choices = ["(None)"]
+
+    # Add ".." to go up a level if not at root
+    if current_path:
+        choices.append("📁 ..")
+
+    # Add folders with folder emoji
+    for folder in folders:
+        choices.append(f"📁 {folder}")
+
+    # Add files
+    choices.extend(files)
+
+    # Display path for user reference
+    display_path = f"/{current_path}" if current_path else "/inputs"
+
+    return gr.update(choices=choices, value="(None)"), display_path
+
+
+def navigate_file_selection(selected: str, current_path: str) -> tuple[gr.Dropdown, str, str]:
+    """
+    Handle folder navigation when an item is selected.
+
+    Args:
+        selected: The selected item from dropdown
+        current_path: Current path being browsed
+
+    Returns:
+        Tuple of (updated dropdown, new path, actual file selection or None)
+    """
+    from pathlib import Path
+
+    # If (None) selected, do nothing
+    if selected == "(None)":
+        dropdown, display = get_items_in_path(current_path)
+        return dropdown, current_path, "(None)"
+
+    # Check if it's a folder (starts with folder emoji)
+    if selected.startswith("📁 "):
+        folder_name = selected[2:].strip()  # Remove emoji and whitespace
+
+        if folder_name == "..":
+            # Go up one level
+            if current_path:
+                new_path = str(Path(current_path).parent)
+                if new_path == ".":
+                    new_path = ""
+            else:
+                new_path = ""
+        else:
+            # Navigate into folder
+            new_path = str(Path(current_path) / folder_name) if current_path else folder_name
+
+        # Update dropdown with new path contents
+        dropdown, display = get_items_in_path(new_path)
+        return dropdown, new_path, "(None)"
+    else:
+        # It's a file - keep it selected but don't navigate
+        dropdown, display = get_items_in_path(current_path)
+        return gr.update(), current_path, selected
+
+
 def get_files_in_folder(folder: str) -> gr.Dropdown:
-    """Get list of files in a specific folder."""
+    """Get list of files in a specific folder (legacy method for compatibility)."""
     global prompt_builder
     if prompt_builder is None:
         prompt_builder = PromptBuilder(config.inputs_dir)
@@ -164,24 +243,21 @@ def get_files_in_folder(folder: str) -> gr.Dropdown:
 
 
 def update_segment_titles(
-    start_folder: str,
     start_file: str,
     start_mode: str,
     start_dynamic: bool,
-    middle_folder: str,
     middle_file: str,
     middle_mode: str,
     middle_dynamic: bool,
-    end_folder: str,
     end_file: str,
     end_mode: str,
     end_dynamic: bool,
 ) -> tuple[gr.Markdown, gr.Markdown, gr.Markdown]:
     """Update segment titles with status and configuration."""
 
-    def format_title(name: str, folder: str, file: str, mode: str, dynamic: bool) -> str:
-        # Check if segment is configured
-        has_config = (folder != "(None)" and file != "(None)")
+    def format_title(name: str, file: str, mode: str, dynamic: bool) -> str:
+        # Check if segment is configured (file is selected and not a folder)
+        has_config = (file and file != "(None)" and not file.startswith("📁"))
 
         if has_config:
             # Green for configured segments
@@ -194,9 +270,9 @@ def update_segment_titles(
             # Gray for unconfigured segments
             return f"**{name}**"
 
-    start_title = format_title("Start Segment", start_folder, start_file, start_mode, start_dynamic)
-    middle_title = format_title("Middle Segment", middle_folder, middle_file, middle_mode, middle_dynamic)
-    end_title = format_title("End Segment", end_folder, end_file, end_mode, end_dynamic)
+    start_title = format_title("Start Segment", start_file, start_mode, start_dynamic)
+    middle_title = format_title("Middle Segment", middle_file, middle_mode, middle_dynamic)
+    end_title = format_title("End Segment", end_file, end_mode, end_dynamic)
 
     return (
         gr.update(value=start_title),
@@ -207,7 +283,7 @@ def update_segment_titles(
 
 def build_prompt_and_update_titles(
     start_text: str,
-    start_folder: str,
+    start_path: str,
     start_file: str,
     start_mode: str,
     start_line: int,
@@ -215,7 +291,7 @@ def build_prompt_and_update_titles(
     start_count: int,
     start_dynamic: bool,
     middle_text: str,
-    middle_folder: str,
+    middle_path: str,
     middle_file: str,
     middle_mode: str,
     middle_line: int,
@@ -223,7 +299,7 @@ def build_prompt_and_update_titles(
     middle_count: int,
     middle_dynamic: bool,
     end_text: str,
-    end_folder: str,
+    end_path: str,
     end_file: str,
     end_mode: str,
     end_line: int,
@@ -234,16 +310,16 @@ def build_prompt_and_update_titles(
     """Build prompt and update segment titles."""
     # Build the prompt
     prompt = build_combined_prompt(
-        start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count,
-        middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count,
-        end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count,
+        start_text, start_path, start_file, start_mode, start_line, start_range_end, start_count,
+        middle_text, middle_path, middle_file, middle_mode, middle_line, middle_range_end, middle_count,
+        end_text, end_path, end_file, end_mode, end_line, end_range_end, end_count,
     )
 
     # Update titles
     titles = update_segment_titles(
-        start_folder, start_file, start_mode, start_dynamic,
-        middle_folder, middle_file, middle_mode, middle_dynamic,
-        end_folder, end_file, end_mode, end_dynamic,
+        start_file, start_mode, start_dynamic,
+        middle_file, middle_mode, middle_dynamic,
+        end_file, end_mode, end_dynamic,
     )
 
     return (prompt, *titles)
@@ -251,21 +327,21 @@ def build_prompt_and_update_titles(
 
 def build_combined_prompt(
     start_text: str,
-    start_folder: str,
+    start_path: str,
     start_file: str,
     start_mode: str,
     start_line: int,
     start_range_end: int,
     start_count: int,
     middle_text: str,
-    middle_folder: str,
+    middle_path: str,
     middle_file: str,
     middle_mode: str,
     middle_line: int,
     middle_range_end: int,
     middle_count: int,
     end_text: str,
-    end_folder: str,
+    end_path: str,
     end_file: str,
     end_mode: str,
     end_line: int,
@@ -290,15 +366,15 @@ def build_combined_prompt(
     segments = []
 
     # Helper to add segment
-    def add_segment(text, folder, file, mode, line, range_end, count):
+    def add_segment(text, path, file, mode, line, range_end, count):
         # Add user text if provided
         if text and text.strip():
             segments.append(("text", text.strip()))
 
-        # Add file selection if file is chosen
-        if folder and folder != "(None)" and file and file != "(None)":
+        # Add file selection if file is chosen and it's not a folder
+        if file and file != "(None)" and not file.startswith("📁"):
             # Get full file path
-            full_path = prompt_builder.get_full_path(folder, file)
+            full_path = prompt_builder.get_full_path(path, file)
 
             if mode == "Random Line":
                 segments.append(("file_random", full_path))
@@ -312,9 +388,9 @@ def build_combined_prompt(
                 segments.append(("file_random_multi", f"{full_path}|{count}"))
 
     # Add segments in order
-    add_segment(start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count)
-    add_segment(middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count)
-    add_segment(end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count)
+    add_segment(start_text, start_path, start_file, start_mode, start_line, start_range_end, start_count)
+    add_segment(middle_text, middle_path, middle_file, middle_mode, middle_line, middle_range_end, middle_count)
+    add_segment(end_text, end_path, end_file, end_mode, end_line, end_range_end, end_count)
 
     # Build the final prompt
     try:
@@ -336,7 +412,7 @@ def generate_image(
     use_random_seed: bool,
     # Segment parameters for dynamic prompts
     start_text: str,
-    start_folder: str,
+    start_path: str,
     start_file: str,
     start_mode: str,
     start_line: int,
@@ -344,7 +420,7 @@ def generate_image(
     start_count: int,
     start_dynamic: bool,
     middle_text: str,
-    middle_folder: str,
+    middle_path: str,
     middle_file: str,
     middle_mode: str,
     middle_line: int,
@@ -352,7 +428,7 @@ def generate_image(
     middle_count: int,
     middle_dynamic: bool,
     end_text: str,
-    end_folder: str,
+    end_path: str,
     end_file: str,
     end_mode: str,
     end_line: int,
@@ -402,9 +478,9 @@ def generate_image(
                 # Build prompt dynamically if any segment is dynamic
                 if has_dynamic:
                     current_prompt = build_combined_prompt(
-                        start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count,
-                        middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count,
-                        end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count,
+                        start_text, start_path, start_file, start_mode, start_line, start_range_end, start_count,
+                        middle_text, middle_path, middle_file, middle_mode, middle_line, middle_range_end, middle_count,
+                        end_text, end_path, end_file, end_mode, end_line, end_range_end, end_count,
                     )
                     if current_prompt:
                         prompts_used.append(current_prompt)
@@ -519,18 +595,16 @@ def create_ui() -> tuple[gr.Blocks, str]:
 
                 # Prompt Builder
                 with gr.Accordion("Prompt Builder", open=False):
-                    gr.Markdown("*Build prompts by combining text and random lines from files in the `inputs/` directory*")
-
-                    # Get available folders
-                    available_folders = get_available_folders()
+                    gr.Markdown("*Build prompts by combining text and random lines from files in the `inputs/` directory*\n\n*Click folders (📁) to navigate, select files to use*")
 
                     # Start Segment
                     with gr.Group():
                         start_segment_title = gr.Markdown("**Start Segment**")
                         start_text = gr.Textbox(label="Start Text", placeholder="Optional text...", lines=1)
                         with gr.Row():
-                            start_folder = gr.Dropdown(label="Folder", choices=available_folders, value="(None)")
-                            start_file = gr.Dropdown(label="File", choices=["(None)"], value="(None)")
+                            start_path_display = gr.Textbox(label="Current Path", value="/inputs", interactive=False, scale=1)
+                            start_file = gr.Dropdown(label="File/Folder Browser", choices=["(None)"], value="(None)", scale=2)
+                        start_path_state = gr.State(value="")  # Hidden state to track current path
                         with gr.Row():
                             start_mode = gr.Dropdown(
                                 label="Mode",
@@ -552,8 +626,9 @@ def create_ui() -> tuple[gr.Blocks, str]:
                         middle_segment_title = gr.Markdown("**Middle Segment**")
                         middle_text = gr.Textbox(label="Middle Text", placeholder="Optional text...", lines=1)
                         with gr.Row():
-                            middle_folder = gr.Dropdown(label="Folder", choices=available_folders, value="(None)")
-                            middle_file = gr.Dropdown(label="File", choices=["(None)"], value="(None)")
+                            middle_path_display = gr.Textbox(label="Current Path", value="/inputs", interactive=False, scale=1)
+                            middle_file = gr.Dropdown(label="File/Folder Browser", choices=["(None)"], value="(None)", scale=2)
+                        middle_path_state = gr.State(value="")  # Hidden state to track current path
                         with gr.Row():
                             middle_mode = gr.Dropdown(
                                 label="Mode",
@@ -575,8 +650,9 @@ def create_ui() -> tuple[gr.Blocks, str]:
                         end_segment_title = gr.Markdown("**End Segment**")
                         end_text = gr.Textbox(label="End Text", placeholder="Optional text...", lines=1)
                         with gr.Row():
-                            end_folder = gr.Dropdown(label="Folder", choices=available_folders, value="(None)")
-                            end_file = gr.Dropdown(label="File", choices=["(None)"], value="(None)")
+                            end_path_display = gr.Textbox(label="Current Path", value="/inputs", interactive=False, scale=1)
+                            end_file = gr.Dropdown(label="File/Folder Browser", choices=["(None)"], value="(None)", scale=2)
+                        end_path_state = gr.State(value="")  # Hidden state to track current path
                         with gr.Row():
                             end_mode = gr.Dropdown(
                                 label="Mode",
@@ -768,23 +844,53 @@ def create_ui() -> tuple[gr.Blocks, str]:
         )
 
         # Event handlers
-        # Prompt Builder folder change handlers
-        start_folder.change(
-            fn=get_files_in_folder,
-            inputs=[start_folder],
-            outputs=[start_file],
+        # Initialize file browsers with root directory contents
+        def init_file_browser():
+            dropdown, display = get_items_in_path("")
+            return dropdown, display
+
+        app.load(
+            fn=init_file_browser,
+            outputs=[start_file, start_path_display],
+        )
+        app.load(
+            fn=init_file_browser,
+            outputs=[middle_file, middle_path_display],
+        )
+        app.load(
+            fn=init_file_browser,
+            outputs=[end_file, end_path_display],
         )
 
-        middle_folder.change(
-            fn=get_files_in_folder,
-            inputs=[middle_folder],
-            outputs=[middle_file],
+        # Hierarchical navigation handlers for file selection
+        start_file.change(
+            fn=navigate_file_selection,
+            inputs=[start_file, start_path_state],
+            outputs=[start_file, start_path_state, start_file],
+        ).then(
+            fn=lambda path: f"/{path}" if path else "/inputs",
+            inputs=[start_path_state],
+            outputs=[start_path_display],
         )
 
-        end_folder.change(
-            fn=get_files_in_folder,
-            inputs=[end_folder],
-            outputs=[end_file],
+        middle_file.change(
+            fn=navigate_file_selection,
+            inputs=[middle_file, middle_path_state],
+            outputs=[middle_file, middle_path_state, middle_file],
+        ).then(
+            fn=lambda path: f"/{path}" if path else "/inputs",
+            inputs=[middle_path_state],
+            outputs=[middle_path_display],
+        )
+
+        end_file.change(
+            fn=navigate_file_selection,
+            inputs=[end_file, end_path_state],
+            outputs=[end_file, end_path_state, end_file],
+        ).then(
+            fn=lambda path: f"/{path}" if path else "/inputs",
+            inputs=[end_path_state],
+            outputs=[end_path_display],
         )
 
         # Prompt Builder mode change handlers
@@ -821,9 +927,9 @@ def create_ui() -> tuple[gr.Blocks, str]:
         build_prompt_btn.click(
             fn=build_prompt_and_update_titles,
             inputs=[
-                start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count, start_dynamic,
-                middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count, middle_dynamic,
-                end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count, end_dynamic,
+                start_text, start_path_state, start_file, start_mode, start_line, start_range_end, start_count, start_dynamic,
+                middle_text, middle_path_state, middle_file, middle_mode, middle_line, middle_range_end, middle_count, middle_dynamic,
+                end_text, end_path_state, end_file, end_mode, end_line, end_range_end, end_count, end_dynamic,
             ],
             outputs=[prompt_input, start_segment_title, middle_segment_title, end_segment_title],
         )
@@ -861,9 +967,9 @@ def create_ui() -> tuple[gr.Blocks, str]:
                 seed_input,
                 random_seed_checkbox,
                 # Segment parameters for dynamic prompts
-                start_text, start_folder, start_file, start_mode, start_line, start_range_end, start_count, start_dynamic,
-                middle_text, middle_folder, middle_file, middle_mode, middle_line, middle_range_end, middle_count, middle_dynamic,
-                end_text, end_folder, end_file, end_mode, end_line, end_range_end, end_count, end_dynamic,
+                start_text, start_path_state, start_file, start_mode, start_line, start_range_end, start_count, start_dynamic,
+                middle_text, middle_path_state, middle_file, middle_mode, middle_line, middle_range_end, middle_count, middle_dynamic,
+                end_text, end_path_state, end_file, end_mode, end_line, end_range_end, end_count, end_dynamic,
             ],
             outputs=[image_output, info_output, seed_used],
         )
