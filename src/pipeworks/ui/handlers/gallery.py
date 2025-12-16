@@ -311,13 +311,9 @@ def apply_gallery_filter(
         # Apply filter
         if filter_mode == "Favorites Only":
             # Filter to only favorited images
-            filtered_images = [
-                img for img in all_images if state.favorites_db.is_favorite(img)
-            ]
+            filtered_images = [img for img in all_images if state.favorites_db.is_favorite(img)]
             state.gallery_filter = "favorites"
-            logger.info(
-                f"Filtered to favorites: {len(filtered_images)} / {len(all_images)} images"
-            )
+            logger.info(f"Filtered to favorites: {len(filtered_images)} / {len(all_images)} images")
         else:
             # Show all images
             filtered_images = all_images
@@ -430,9 +426,7 @@ def switch_gallery_root(
         images = state.gallery_browser.scan_images(current_path)
         state.gallery_images = images
 
-        logger.info(
-            f"Switched to {root_name} root: {len(images)} images, {len(folders)} folders"
-        )
+        logger.info(f"Switched to {root_name} root: {len(images)} images, {len(folders)} folders")
         return gr.update(choices=choices, value="-- Select folder --"), current_path, images, state
 
     except Exception as e:
