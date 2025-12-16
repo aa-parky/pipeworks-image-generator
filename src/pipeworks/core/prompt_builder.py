@@ -1,4 +1,94 @@
-"""Prompt builder utility for constructing prompts from text files and user input."""
+"""Prompt builder utility for constructing prompts from text files and user input.
+
+This module provides the PromptBuilder class, which enables flexible prompt
+construction by combining text from multiple sources:
+- Direct user input (text strings)
+- Random lines from text files
+- Specific lines or line ranges from text files
+- Multiple random lines from text files
+
+The prompt builder is designed to work with a directory of text files
+(typically the inputs/ directory) where each file contains prompt fragments,
+keywords, or descriptions. This allows for:
+- Reusable prompt libraries
+- Randomized prompt generation for variety
+- Consistent prompt styling across generations
+
+File Organization
+-----------------
+The inputs directory can have a nested structure:
+    inputs/
+    ├── characters.txt
+    ├── environments.txt
+    ├── styles/
+    │   ├── realistic.txt
+    │   ├── anime.txt
+    │   └── abstract.txt
+    └── modifiers/
+        ├── lighting.txt
+        └── camera.txt
+
+Each text file should contain one item per line:
+    # styles/realistic.txt
+    photorealistic
+    hyperrealistic
+    realistic photograph
+    professional photograph
+    high quality photo
+
+Selection Modes
+---------------
+The PromptBuilder supports multiple selection modes for each file:
+
+1. **Random Line**: Pick one random line from the file
+2. **Specific Line**: Select line N (1-indexed)
+3. **Line Range**: Select lines N through M (inclusive)
+4. **All Lines**: Use all lines from the file
+5. **N Random Lines**: Pick N random lines without replacement
+
+Caching
+-------
+File contents are cached in memory after first read to improve performance
+when the same file is accessed multiple times. Call clear_cache() if files
+are modified during runtime.
+
+Usage Example
+-------------
+Basic usage:
+
+    >>> from pipeworks.core.prompt_builder import PromptBuilder
+    >>> from pathlib import Path
+    >>> builder = PromptBuilder(Path("inputs"))
+    >>>
+    >>> # Get a random line from a file
+    >>> style = builder.get_random_line("styles/realistic.txt")
+    >>> print(style)
+    'photorealistic'
+    >>>
+    >>> # Build a complete prompt
+    >>> segments = [
+    ...     ("text", "a beautiful landscape"),
+    ...     ("file_random", "styles/realistic.txt"),
+    ...     ("file_random", "modifiers/lighting.txt"),
+    ... ]
+    >>> prompt = builder.build_prompt(segments)
+    >>> print(prompt)
+    'a beautiful landscape, photorealistic, golden hour lighting'
+
+Integration with UI
+-------------------
+The prompt builder integrates with the Gradio UI to provide:
+- Folder navigation dropdown
+- File selection dropdown
+- Mode selection (random/specific/range/all)
+- Live preview of file contents
+- Three prompt segments (start/middle/end) for flexible composition
+
+See Also
+--------
+- ui/components.py: SegmentUI class for UI integration
+- ui/handlers.py: Prompt builder event handlers
+"""
 
 import logging
 import random
@@ -8,7 +98,54 @@ logger = logging.getLogger(__name__)
 
 
 class PromptBuilder:
-    """Build prompts by combining text files and user input."""
+    """Build prompts by combining text files and user input.
+
+    The PromptBuilder provides a file-based approach to prompt construction,
+    allowing users to organize reusable prompt fragments in text files and
+    combine them in flexible ways.
+
+    The builder maintains a cache of file contents for performance, and supports
+    various selection modes for retrieving lines from files.
+
+    Attributes
+    ----------
+    inputs_dir : Path
+        Directory containing input text files
+    _file_cache : dict
+        Cache of file contents (path -> list of lines)
+
+    Notes
+    -----
+    - File paths are relative to inputs_dir
+    - Empty lines are stripped from files
+    - All lines are trimmed of whitespace
+    - File cache persists across multiple calls
+    - Thread-safety is not guaranteed (single-threaded use expected)
+
+    Examples
+    --------
+    Create a builder and scan for files:
+
+        >>> builder = PromptBuilder(Path("inputs"))
+        >>> files = builder.scan_text_files()
+        >>> print(files)
+        ['characters.txt', 'styles/realistic.txt', 'modifiers/lighting.txt']
+
+    Get random lines:
+
+        >>> line1 = builder.get_random_line("characters.txt")
+        >>> line2 = builder.get_random_line("styles/realistic.txt")
+        >>> prompt = f"{line1}, {line2}"
+
+    Build a complete prompt:
+
+        >>> segments = [
+        ...     ("text", "a wizard"),
+        ...     ("file_random", "modifiers/clothing.txt"),
+        ...     ("file_random", "environments.txt"),
+        ... ]
+        >>> prompt = builder.build_prompt(segments)
+    """
 
     def __init__(self, inputs_dir: Path):
         """
@@ -152,29 +289,43 @@ class PromptBuilder:
         return f"{folder}/{filename}" if folder else filename
 
     def read_file_lines(self, file_path: str) -> list[str]:
-        """
-        Read lines from a text file.
+        """Read lines from a text file with caching.
+
+        This method implements a simple in-memory cache to avoid repeatedly
+        reading the same file from disk. The cache is a dictionary mapping
+        file paths to their parsed line lists.
 
         Args:
             file_path: Relative path from inputs_dir
 
         Returns:
             List of non-empty lines (stripped of whitespace)
+
+        Notes:
+            - Empty lines are automatically filtered out
+            - Leading/trailing whitespace is removed from each line
+            - Results are cached in memory for subsequent calls
+            - Cache persists for the lifetime of the PromptBuilder instance
         """
-        # Check cache first
+        # Check cache first to avoid redundant file I/O
+        # This significantly improves performance for repeated access
         if file_path in self._file_cache:
             return self._file_cache[file_path]
 
+        # Construct full absolute path
         full_path = self.inputs_dir / file_path
         if not full_path.exists():
             logger.error(f"File not found: {full_path}")
             return []
 
         try:
+            # Read file with UTF-8 encoding (supports international characters)
             with open(full_path, encoding="utf-8") as f:
+                # Strip whitespace and filter out empty lines
+                # This ensures consistent behavior regardless of file formatting
                 lines = [line.strip() for line in f.readlines() if line.strip()]
 
-            # Cache the result
+            # Cache the parsed result for future calls
             self._file_cache[file_path] = lines
             return lines
 
@@ -270,35 +421,66 @@ class PromptBuilder:
         return ", ".join(selected)
 
     def build_prompt(self, segments: list[tuple[str, str]]) -> str:
-        """
-        Build a prompt from a list of segments.
+        """Build a prompt from a list of segments.
+
+        This is the main orchestration method that combines multiple prompt
+        segments into a single prompt string. Each segment can be either
+        direct text or a reference to file content with a specific selection mode.
+
+        The method processes segments in order, extracts content based on the
+        segment type, and combines non-empty results with comma separators.
 
         Args:
             segments: List of (segment_type, content) tuples
-                     segment_type can be: 'text', 'file_random', 'file_specific',
-                                        'file_range', 'file_all', 'file_random_multi'
+                     segment_type can be:
+                     - 'text': Direct user input text
+                     - 'file_random': Random line from file
+                     - 'file_specific': Specific line (format: "filepath|line_number")
+                     - 'file_range': Line range (format: "filepath|start|end")
+                     - 'file_all': All lines from file
+                     - 'file_random_multi': N random lines (format: "filepath|count")
 
         Returns:
-            Combined prompt string
+            Combined prompt string with segments joined by ", "
+
+        Notes:
+            - Empty segments are automatically skipped
+            - Invalid segment formats are logged as errors
+            - File operations use the cached read_file_lines method
+            - Results are deterministic except for random selections
+
+        Examples:
+            >>> segments = [
+            ...     ("text", "a wizard"),
+            ...     ("file_random", "clothing.txt"),
+            ...     ("file_specific", "colors.txt|3"),
+            ...     ("file_random_multi", "modifiers.txt|2"),
+            ... ]
+            >>> prompt = builder.build_prompt(segments)
+            >>> print(prompt)
+            'a wizard, wearing robes, blue, highly detailed, 4k'
         """
         parts = []
 
+        # Process each segment in order
         for segment_type, content in segments:
+            # Skip empty segments
             if not content or content.strip() == "":
                 continue
 
             if segment_type == "text":
-                # User text input
+                # Direct user text input - use as-is
                 parts.append(content.strip())
 
             elif segment_type == "file_random":
-                # Random line from file
+                # Random line from file - provides variation
                 result = self.get_random_line(content)
                 if result:
                     parts.append(result)
 
             elif segment_type == "file_specific":
                 # Specific line from file (format: "filepath|line_number")
+                # Used when user wants precise control
                 try:
                     filepath, line_num = content.split("|")
                     result = self.get_specific_line(filepath, int(line_num))
@@ -309,6 +491,7 @@ class PromptBuilder:
 
             elif segment_type == "file_range":
                 # Range of lines (format: "filepath|start|end")
+                # Useful for combining related modifiers
                 try:
                     filepath, start, end = content.split("|")
                     result = self.get_line_range(filepath, int(start), int(end))
@@ -318,13 +501,14 @@ class PromptBuilder:
                     logger.error(f"Invalid file_range format: {content}")
 
             elif segment_type == "file_all":
-                # All lines from file
+                # All lines from file - kitchen sink approach
                 result = self.get_all_lines(content)
                 if result:
                     parts.append(result)
 
             elif segment_type == "file_random_multi":
                 # Multiple random lines (format: "filepath|count")
+                # Balance between variation and control
                 try:
                     filepath, count = content.split("|")
                     result = self.get_random_lines(filepath, int(count))
@@ -334,6 +518,7 @@ class PromptBuilder:
                     logger.error(f"Invalid file_random_multi format: {content}")
 
         # Join all parts with comma-space separator
+        # This creates a natural prompt structure that works well with diffusion models
         return ", ".join(parts)
 
     def get_file_info(self, file_path: str) -> dict:

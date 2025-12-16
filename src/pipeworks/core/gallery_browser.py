@@ -73,22 +73,50 @@ class GalleryBrowser:
             return "outputs"  # Default
 
     def validate_path(self, relative_path: str) -> bool:
-        """
-        Validate that a relative path stays within current root directory.
+        """Validate that a relative path stays within current root directory.
+
+        This method provides security against path traversal attacks by ensuring
+        that user-provided paths cannot escape the outputs/catalog directories.
+        For example, paths like "../../../etc/passwd" are rejected.
+
+        The validation works by:
+        1. Resolving the path to its absolute form (follows symlinks)
+        2. Checking if the resolved path is within the root directory tree
+        3. Rejecting any path that escapes the root
 
         Args:
             relative_path: Path relative to current_root
 
         Returns:
-            True if path is safe, False otherwise
+            True if path is safe (within root), False otherwise
+
+        Notes:
+            - Empty paths are considered valid (refers to root itself)
+            - Path resolution follows symbolic links
+            - Uses Path.is_relative_to() for safe containment check
+            - Catches both ValueError (invalid path) and OSError (permission issues)
+
+        Examples:
+            >>> browser = GalleryBrowser(Path("outputs"))
+            >>> browser.validate_path("subfolder/image.png")  # OK
+            True
+            >>> browser.validate_path("../../../etc/passwd")  # Rejected
+            False
         """
         if not relative_path:
             return True
 
         try:
+            # Combine root with relative path and resolve to absolute form
+            # .resolve() follows symlinks and normalizes the path
             full_path = (self.current_root / relative_path).resolve()
+
+            # Check if resolved path is within the root directory tree
+            # This prevents path traversal attacks (../ escaping)
             return full_path.is_relative_to(self.current_root.resolve())
         except (ValueError, OSError):
+            # ValueError: malformed path
+            # OSError: permission denied or path doesn't exist
             return False
 
     def get_items_in_path(self, relative_path: str = "") -> tuple[list[str], list[str]]:
@@ -115,12 +143,17 @@ class GalleryBrowser:
         images = []
 
         try:
+            # Iterate through items at this level only (not recursive)
             for item in sorted(current_path.iterdir()):
                 if item.is_dir():
-                    # Only add if directory contains images (directly or in subdirectories)
+                    # Only add directory if it contains images (directly or in subdirectories)
+                    # This avoids showing empty directories in the UI
+                    # rglob("*.png") recursively searches for PNG files
+                    # any() returns True if at least one PNG is found
                     if any(item.rglob("*.png")):
                         folders.append(item.name)
                 elif item.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
+                    # Add image files at this level
                     images.append(item.name)
         except PermissionError:
             logger.error(f"Permission denied accessing: {current_path}")

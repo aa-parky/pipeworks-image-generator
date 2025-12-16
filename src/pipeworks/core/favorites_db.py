@@ -54,25 +54,40 @@ class FavoritesDB:
     def _normalize_path(self, image_path: str | Path) -> str:
         """Normalize image path to relative path from project root.
 
+        Path normalization ensures consistent storage and comparison of paths
+        across different operating systems and path formats. This method:
+        1. Converts absolute paths to relative (when possible)
+        2. Standardizes path separators to forward slashes
+        3. Maintains cross-platform compatibility
+
         Args:
             image_path: Absolute or relative image path
 
         Returns:
             Normalized relative path as string
+
+        Notes:
+            - Relative paths are stored as-is (already relative to project root)
+            - Absolute paths within project are converted to relative
+            - Absolute paths outside project are stored as absolute
+            - Forward slashes used for consistency across Windows/Unix
         """
         path = Path(image_path)
 
-        # If absolute, try to make relative to current directory
+        # If absolute, try to make relative to current working directory
+        # This allows for portable database that works across different setups
         if path.is_absolute():
             try:
-                # Try to find common base (project root)
+                # Try to express path relative to project root (cwd)
                 cwd = Path.cwd()
                 path = path.relative_to(cwd)
             except ValueError:
-                # If not relative to cwd, use as-is
+                # Path is outside project directory (e.g., /tmp/image.png)
+                # Store as absolute path in this case
                 pass
 
-        # Convert to string with forward slashes for consistency
+        # Convert to string with forward slashes for cross-platform consistency
+        # Windows paths use backslashes, but forward slashes work everywhere
         return str(path).replace("\\", "/")
 
     def add_favorite(self, image_path: str | Path) -> bool:
@@ -89,6 +104,10 @@ class FavoritesDB:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+
+                # Use INSERT OR IGNORE to handle duplicate entries gracefully
+                # If image_path already exists (PRIMARY KEY), the insert is ignored
+                # This is more efficient than checking for existence first
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO favorites (image_path, favorited_at)
@@ -98,7 +117,8 @@ class FavoritesDB:
                 )
                 conn.commit()
 
-                # Check if row was actually inserted
+                # Check if row was actually inserted (rowcount > 0)
+                # or ignored because it already existed (rowcount == 0)
                 was_inserted = cursor.rowcount > 0
                 if was_inserted:
                     logger.info(f"Added to favorites: {normalized_path}")

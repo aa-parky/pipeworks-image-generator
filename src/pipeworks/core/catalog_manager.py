@@ -74,20 +74,24 @@ class CatalogManager:
             return stats
 
         # Filter to only outputs/ images (check if path is within outputs_dir)
+        # This prevents moving images that are already in catalog/ or other directories
         outputs_favorites = []
         for img_path_str in all_favorites:
             try:
                 img_path = Path(img_path_str)
-                # Resolve to absolute path
+
+                # Convert to absolute path if relative
+                # Relative paths are resolved from current working directory
                 if not img_path.is_absolute():
                     img_path = Path.cwd() / img_path
                 img_path = img_path.resolve()
 
-                # Check if it's within outputs directory
+                # Check if the resolved path is within the outputs directory tree
+                # This uses Path.is_relative_to() which is safe for path traversal
                 if img_path.is_relative_to(self.outputs_dir.resolve()):
                     outputs_favorites.append(img_path_str)
             except (ValueError, Exception):
-                # Skip paths that can't be resolved
+                # Skip paths that can't be resolved or have permission issues
                 pass
 
         logger.info(f"Found {len(outputs_favorites)} favorites in outputs directory")
@@ -146,11 +150,13 @@ class CatalogManager:
             # Create destination directory
             catalog_dest.parent.mkdir(parents=True, exist_ok=True)
 
-            # Move image file
+            # Move the main image file
             logger.info(f"Moving: {image_path} -> {catalog_dest}")
             shutil.move(str(image_path), str(catalog_dest))
 
             # Move associated metadata files (.txt and .json)
+            # These files have the same basename as the image but different extensions
+            # .txt contains the prompt, .json contains full generation parameters
             for suffix in [".txt", ".json"]:
                 metadata_path = image_path.with_suffix(suffix)
                 if metadata_path.exists():
@@ -228,7 +234,9 @@ class CatalogManager:
                             break
 
                     if not found:
-                        warnings.append(f"Orphaned metadata: {metadata_file.relative_to(self.catalog_dir)}")
+                        warnings.append(
+                            f"Orphaned metadata: {metadata_file.relative_to(self.catalog_dir)}"
+                        )
 
             # Check for empty directories
             for dirpath in self.catalog_dir.rglob("*"):
