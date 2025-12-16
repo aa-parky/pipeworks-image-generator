@@ -8,26 +8,76 @@ logger = logging.getLogger(__name__)
 
 
 class GalleryBrowser:
-    """Browse generated images and their metadata in the outputs directory."""
+    """Browse generated images and their metadata in the outputs and catalog directories."""
 
-    def __init__(self, outputs_dir: Path):
+    def __init__(self, outputs_dir: Path, catalog_dir: Path | None = None):
         """
         Initialize the gallery browser.
 
         Args:
             outputs_dir: Base directory containing generated images
+            catalog_dir: Optional catalog directory for archived images
         """
         self.outputs_dir = Path(outputs_dir)
+        self.catalog_dir = Path(catalog_dir) if catalog_dir else None
+        self.current_root = self.outputs_dir  # Start with outputs as default
+
         if not self.outputs_dir.exists():
             logger.warning(f"Outputs directory does not exist: {self.outputs_dir}")
             self.outputs_dir.mkdir(parents=True, exist_ok=True)
 
-    def validate_path(self, relative_path: str) -> bool:
+        if self.catalog_dir and not self.catalog_dir.exists():
+            logger.info(f"Creating catalog directory: {self.catalog_dir}")
+            self.catalog_dir.mkdir(parents=True, exist_ok=True)
+
+    def get_root_choices(self) -> list[str]:
+        """Get browseable root directories.
+
+        Returns:
+            List of available roots with emoji prefixes
         """
-        Validate that a relative path stays within outputs directory.
+        choices = ["📁 outputs"]
+        if self.catalog_dir:
+            choices.append("📁 catalog")
+        return choices
+
+    def set_root(self, root_name: str) -> None:
+        """Switch between outputs and catalog root.
 
         Args:
-            relative_path: Path relative to outputs_dir
+            root_name: Root name ("outputs" or "catalog", optionally with 📁 prefix)
+        """
+        # Strip emoji prefix if present
+        root_name = root_name.replace("📁 ", "").strip()
+
+        if root_name == "outputs":
+            self.current_root = self.outputs_dir
+            logger.info("Switched to outputs root")
+        elif root_name == "catalog" and self.catalog_dir:
+            self.current_root = self.catalog_dir
+            logger.info("Switched to catalog root")
+        else:
+            logger.warning(f"Invalid root name: {root_name}")
+
+    def get_current_root_name(self) -> str:
+        """Get the current root directory name.
+
+        Returns:
+            "outputs" or "catalog"
+        """
+        if self.current_root == self.outputs_dir:
+            return "outputs"
+        elif self.current_root == self.catalog_dir:
+            return "catalog"
+        else:
+            return "outputs"  # Default
+
+    def validate_path(self, relative_path: str) -> bool:
+        """
+        Validate that a relative path stays within current root directory.
+
+        Args:
+            relative_path: Path relative to current_root
 
         Returns:
             True if path is safe, False otherwise
@@ -36,8 +86,8 @@ class GalleryBrowser:
             return True
 
         try:
-            full_path = (self.outputs_dir / relative_path).resolve()
-            return full_path.is_relative_to(self.outputs_dir.resolve())
+            full_path = (self.current_root / relative_path).resolve()
+            return full_path.is_relative_to(self.current_root.resolve())
         except (ValueError, OSError):
             return False
 
@@ -46,7 +96,7 @@ class GalleryBrowser:
         Get folders and image files at a specific path level (non-recursive).
 
         Args:
-            relative_path: Path relative to outputs_dir (empty string for root)
+            relative_path: Path relative to current_root (empty string for root)
 
         Returns:
             Tuple of (folders, image_files) at this level only
@@ -56,7 +106,7 @@ class GalleryBrowser:
             logger.error(f"Invalid path: {relative_path}")
             return [], []
 
-        current_path = self.outputs_dir / relative_path if relative_path else self.outputs_dir
+        current_path = self.current_root / relative_path if relative_path else self.current_root
 
         if not current_path.exists():
             return [], []
@@ -82,7 +132,7 @@ class GalleryBrowser:
         Scan for all images at a specific path level (non-recursive).
 
         Args:
-            relative_path: Path relative to outputs_dir
+            relative_path: Path relative to current_root
 
         Returns:
             List of full paths to image files
@@ -92,7 +142,7 @@ class GalleryBrowser:
             logger.error(f"Invalid path: {relative_path}")
             return []
 
-        current_path = self.outputs_dir / relative_path if relative_path else self.outputs_dir
+        current_path = self.current_root / relative_path if relative_path else self.current_root
 
         if not current_path.exists():
             return []

@@ -10,14 +10,18 @@ from pipeworks.plugins.base import plugin_registry
 from .components import SegmentUI, create_three_segments, update_mode_visibility
 from .handlers import (
     analyze_prompt,
+    apply_gallery_filter,
     build_combined_prompt,
     generate_image,
     initialize_gallery_browser,
     load_gallery_folder,
+    move_favorites_to_catalog,
     navigate_file_selection,
     refresh_gallery,
     select_gallery_image,
     set_aspect_ratio,
+    switch_gallery_root,
+    toggle_favorite,
     toggle_metadata_format,
     toggle_save_metadata_handler,
     update_plugin_config_handler,
@@ -468,6 +472,12 @@ def create_gallery_tab(ui_state):
     gr.Markdown("### Browse Generated Images")
 
     with gr.Row():
+        root_selector = gr.Dropdown(
+            label="Browse",
+            choices=["📁 outputs", "📁 catalog"],
+            value="📁 outputs",
+            scale=1,
+        )
         folder_dropdown = gr.Dropdown(
             label="Browse Folders",
             choices=["(No folders)"],
@@ -475,6 +485,14 @@ def create_gallery_tab(ui_state):
             scale=3,
         )
         refresh_btn = gr.Button("Refresh", size="sm", scale=1)
+
+    with gr.Row():
+        filter_dropdown = gr.Dropdown(
+            label="Filter",
+            choices=["All Images", "Favorites Only"],
+            value="All Images",
+            scale=2,
+        )
 
     # Hidden state for current path
     current_path_state = gr.State("")
@@ -500,6 +518,14 @@ def create_gallery_tab(ui_state):
                 show_label=True,
             )
 
+            with gr.Row():
+                favorite_btn = gr.Button("☆ Favorite", size="sm", scale=1)
+                move_catalog_btn = gr.Button(
+                    "Move Favorites to Catalog", size="sm", scale=2, variant="primary"
+                )
+
+            catalog_info = gr.Markdown(value="", visible=True)
+
             metadata_toggle = gr.Radio(
                 choices=["Text (.txt)", "JSON (.json)"],
                 value="Text (.txt)",
@@ -513,22 +539,62 @@ def create_gallery_tab(ui_state):
 
     # Event handlers for gallery browser
 
+    # Root selector
+    root_selector.change(
+        fn=switch_gallery_root,
+        inputs=[root_selector, ui_state],
+        outputs=[folder_dropdown, current_path_state, gallery, ui_state],
+    ).then(
+        fn=lambda root, path: (
+            f"**Current:** /{root.replace('📁 ', '')}/{path}"
+            if path
+            else f"**Current:** /{root.replace('📁 ', '')}"
+        ),
+        inputs=[root_selector, current_path_state],
+        outputs=[current_path_display],
+    )
+
     # Folder navigation
     folder_dropdown.change(
         fn=load_gallery_folder,
         inputs=[folder_dropdown, current_path_state, ui_state],
         outputs=[folder_dropdown, current_path_state, gallery, ui_state],
     ).then(
-        fn=lambda path: f"**Current:** /outputs/{path}" if path else "**Current:** /outputs",
-        inputs=[current_path_state],
+        fn=lambda root, path: (
+            f"**Current:** /{root.replace('📁 ', '')}/{path}"
+            if path
+            else f"**Current:** /{root.replace('📁 ', '')}"
+        ),
+        inputs=[root_selector, current_path_state],
         outputs=[current_path_display],
+    )
+
+    # Filter dropdown
+    filter_dropdown.change(
+        fn=apply_gallery_filter,
+        inputs=[filter_dropdown, current_path_state, ui_state],
+        outputs=[gallery, ui_state],
     )
 
     # Image selection - uses gr.SelectData for event
     gallery.select(
         fn=select_gallery_image,
         inputs=[metadata_toggle, ui_state],
-        outputs=[selected_image, metadata_display, ui_state],
+        outputs=[selected_image, metadata_display, favorite_btn, ui_state],
+    )
+
+    # Favorite button
+    favorite_btn.click(
+        fn=toggle_favorite,
+        inputs=[ui_state],
+        outputs=[favorite_btn, catalog_info, ui_state],
+    )
+
+    # Move to catalog button
+    move_catalog_btn.click(
+        fn=move_favorites_to_catalog,
+        inputs=[ui_state],
+        outputs=[catalog_info, gallery, ui_state],
     )
 
     # Metadata format toggle

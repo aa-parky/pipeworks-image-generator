@@ -78,6 +78,10 @@ class PipeworksConfig(BaseSettings):
         default=Path("outputs"),
         description="Directory to save generated images",
     )
+    catalog_dir: Path = Field(
+        default=Path("catalog"),
+        description="Directory for cataloged/archived images",
+    )
 
     # UI settings
     gradio_server_name: str = Field(
@@ -101,6 +105,7 @@ class PipeworksConfig(BaseSettings):
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self.inputs_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
+        self.catalog_dir.mkdir(parents=True, exist_ok=True)
 
 
 # Global config instance

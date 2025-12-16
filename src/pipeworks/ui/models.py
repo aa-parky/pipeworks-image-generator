@@ -126,6 +126,12 @@ class UIState:
     gallery_selected_index: int | None = None  # Currently selected image index
     gallery_initialized: bool = False  # Track if gallery has been initialized
 
+    # Favorites and catalog state
+    favorites_db: Any | None = None  # FavoritesDB instance
+    catalog_manager: Any | None = None  # CatalogManager instance
+    gallery_filter: str = "all"  # "all" or "favorites"
+    gallery_root: str = "outputs"  # Current root: "outputs" or "catalog"
+
     def is_initialized(self) -> bool:
         """Check if the state has been initialized with core components.
 

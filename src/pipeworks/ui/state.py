@@ -2,7 +2,9 @@
 
 import logging
 
+from pipeworks.core.catalog_manager import CatalogManager
 from pipeworks.core.config import config
+from pipeworks.core.favorites_db import FavoritesDB
 from pipeworks.core.gallery_browser import GalleryBrowser
 from pipeworks.core.pipeline import ImageGenerator
 from pipeworks.core.prompt_builder import PromptBuilder
@@ -69,8 +71,23 @@ def initialize_ui_state(state: UIState | None = None) -> UIState:
         # Initialize gallery browser (lazy-loaded for gallery tab)
         if state.gallery_browser is None:
             logger.info("Initializing GalleryBrowser")
-            state.gallery_browser = GalleryBrowser(config.outputs_dir)
+            state.gallery_browser = GalleryBrowser(config.outputs_dir, config.catalog_dir)
             logger.info("GalleryBrowser initialized successfully")
+
+        # Initialize favorites database (lazy-loaded for gallery tab)
+        if state.favorites_db is None:
+            logger.info("Initializing FavoritesDB")
+            db_path = config.outputs_dir / ".pipeworks_favorites.db"
+            state.favorites_db = FavoritesDB(db_path)
+            logger.info("FavoritesDB initialized successfully")
+
+        # Initialize catalog manager (lazy-loaded for gallery tab)
+        if state.catalog_manager is None:
+            logger.info("Initializing CatalogManager")
+            state.catalog_manager = CatalogManager(
+                config.outputs_dir, config.catalog_dir, state.favorites_db
+            )
+            logger.info("CatalogManager initialized successfully")
 
         logger.info(f"UIState initialization complete: {state}")
         return state
@@ -159,6 +176,8 @@ def cleanup_ui_state(state: UIState) -> None:
         state.tokenizer_analyzer = None
         state.prompt_builder = None
         state.gallery_browser = None
+        state.favorites_db = None
+        state.catalog_manager = None
         state.active_plugins.clear()
 
         logger.info("UIState cleanup complete")
