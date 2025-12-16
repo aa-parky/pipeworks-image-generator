@@ -336,11 +336,11 @@ def create_generation_tab(ui_state):
         # Build prompt button handler
         def build_and_update_prompt(*values):
             """Build prompt from segment values and update UI."""
-            # Split values into segment groups (8 values each)
-            start_values = values[0:8]
-            middle_values = values[8:16]
-            end_values = values[16:24]
-            state = values[24]
+            # Split values into segment groups (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
+            start_values = values[0:9]
+            middle_values = values[9:18]
+            end_values = values[18:27]
+            state = values[27]
 
             # Convert to SegmentConfig objects
             start_cfg = SegmentUI.values_to_config(*start_values)
@@ -414,11 +414,11 @@ def create_generation_tab(ui_state):
             seed = values[6]
             use_random_seed = values[7]
 
-            # Segment values (8 values each)
-            start_values = values[8:16]
-            middle_values = values[16:24]
-            end_values = values[24:32]
-            state = values[32]
+            # Segment values (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
+            start_values = values[8:17]
+            middle_values = values[17:26]
+            end_values = values[26:35]
+            state = values[35]
 
             # Convert to SegmentConfig objects
             start_cfg = SegmentUI.values_to_config(*start_values)
