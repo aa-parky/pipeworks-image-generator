@@ -106,18 +106,15 @@ def create_generation_tab(ui_state):
             gr.Markdown("### Generation Settings")
 
             # Model Selection
-            with gr.Row():
-                model_dropdown = gr.Dropdown(
-                    label="Model",
-                    choices=get_available_models(),
-                    value=config.default_model_adapter,
-                    info="Select AI model for generation",
-                    scale=3,
-                )
-                model_status = gr.Markdown(
-                    value=f"✅ **Current:** {config.default_model_adapter}",
-                    scale=2,
-                )
+            model_dropdown = gr.Dropdown(
+                label="Model",
+                choices=get_available_models(),
+                value=config.default_model_adapter,
+                info="Select AI model for generation",
+            )
+            model_status = gr.Markdown(
+                value=f"✅ **Current:** {config.default_model_adapter}"
+            )
 
             prompt_input = gr.Textbox(
                 label="Prompt",
