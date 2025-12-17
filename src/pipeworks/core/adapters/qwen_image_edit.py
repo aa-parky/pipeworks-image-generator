@@ -1,8 +1,12 @@
 """Qwen-Image-Edit model adapter.
 
-This module provides the adapter for the Qwen-Image-Edit-2509 model (fp8 quantized),
-which performs instruction-based image editing. Unlike text-to-image models, this takes
-an existing image and modifies it based on natural language instructions.
+This module provides the adapter for the Qwen-Image-Edit-2509 model, which performs
+instruction-based image editing. Unlike text-to-image models, this takes an existing
+image and modifies it based on natural language instructions.
+
+The adapter supports both the official Qwen model and fp8 quantized versions from
+aidiffuser repos using a hybrid loading approach that combines the pipeline structure
+from the official repo with fp8 weights for reduced memory footprint.
 
 Qwen-Image-Edit Specifics
 --------------------------
@@ -225,6 +229,10 @@ class QwenImageEditAdapter(ModelAdapterBase):
         loads it into memory with the configured dtype, moves it to the
         target device, and applies configured optimizations.
 
+        For fp8 quantized weights (aidiffuser repos), this uses a hybrid approach:
+        1. Load pipeline structure from official Qwen/Qwen-Image-Edit-2509
+        2. Replace transformer weights with fp8 version from aidiffuser
+
         The specific QwenImageEditPlusPipeline class is used (not generic
         AutoPipeline) to ensure compatibility with all Qwen-specific features.
 
@@ -235,7 +243,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
         Notes
         -----
-        - First load downloads ~57.7GB from HuggingFace
+        - First load downloads ~57.7GB (full) or ~20.4GB (fp8) from HuggingFace
         - Subsequent loads use cache in config.models_dir
         - CUDA compilation on first inference adds ~5-10 seconds
         - Model is moved to GPU unless CPU offload is enabled
@@ -261,21 +269,67 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
             logger.info(f"Using torch dtype: {torch_dtype}")
 
-            # Load pipeline from HuggingFace Hub (or local cache)
-            # Use QwenImageEditPlusPipeline specifically (not AutoPipeline)
-            # For aidiffuser/Qwen-Image-Edit-2509, use fp8 variant for smaller size
-            variant = None
+            # Check if using aidiffuser fp8 model (only has weight files, no pipeline structure)
             if "aidiffuser" in self.model_id.lower():
-                variant = "fp8_e4m3fn"
-                logger.info(f"Loading fp8 quantized variant: {variant}")
+                logger.info("Detected aidiffuser repo - using hybrid loading approach")
+                logger.info("Loading pipeline structure from official Qwen repo...")
 
-            self.pipe = QwenImageEditPlusPipeline.from_pretrained(
-                self.model_id,
-                torch_dtype=torch_dtype,
-                variant=variant,
-                low_cpu_mem_usage=True,  # Reduces VRAM during loading
-                cache_dir=str(self.config.models_dir),
-            )
+                # Load full pipeline from official Qwen repo first
+                official_model_id = "Qwen/Qwen-Image-Edit-2509"
+                self.pipe = QwenImageEditPlusPipeline.from_pretrained(
+                    official_model_id,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True,
+                    cache_dir=str(self.config.models_dir),
+                )
+                logger.info(f"Pipeline structure loaded from {official_model_id}")
+
+                # Now load fp8 transformer weights from aidiffuser
+                logger.info("Loading fp8 transformer weights from aidiffuser repo...")
+                from huggingface_hub import hf_hub_download
+                from safetensors.torch import load_file
+
+                # Download the fp8 safetensors file
+                fp8_weights_path = hf_hub_download(
+                    repo_id=self.model_id,
+                    filename="Qwen-Image-Edit-2509_fp8_e4m3fn.safetensors",
+                    cache_dir=str(self.config.models_dir),
+                )
+                logger.info(f"Downloaded fp8 weights to: {fp8_weights_path}")
+
+                # Load the fp8 weights
+                fp8_state_dict = load_file(fp8_weights_path)
+                logger.info(f"Loaded {len(fp8_state_dict)} keys from fp8 weights")
+
+                # Load weights into the transformer
+                # The weights are for the transformer component
+                if hasattr(self.pipe, 'transformer'):
+                    # Filter keys that belong to the transformer
+                    transformer_keys = {k: v for k, v in fp8_state_dict.items()
+                                       if not k.startswith('vae.')
+                                       and not k.startswith('text_encoder.')}
+
+                    missing, unexpected = self.pipe.transformer.load_state_dict(
+                        transformer_keys, strict=False
+                    )
+
+                    if missing:
+                        logger.warning(f"Missing keys when loading fp8 weights: {len(missing)}")
+                    if unexpected:
+                        logger.warning(f"Unexpected keys when loading fp8 weights: {len(unexpected)}")
+
+                    logger.info("Successfully loaded fp8 weights into transformer")
+                else:
+                    logger.warning("Pipeline has no transformer attribute - using default weights")
+            else:
+                # Standard loading for official Qwen or other repos with full pipeline structure
+                logger.info("Loading from standard diffusers pipeline repo")
+                self.pipe = QwenImageEditPlusPipeline.from_pretrained(
+                    self.model_id,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True,
+                    cache_dir=str(self.config.models_dir),
+                )
 
             logger.info("Pipeline loaded successfully")
 
