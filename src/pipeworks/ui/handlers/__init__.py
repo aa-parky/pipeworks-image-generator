@@ -24,7 +24,9 @@ from .gallery import (
 )
 from .generation import (
     generate_image,
+    get_available_models,
     set_aspect_ratio,
+    switch_model_handler,
     toggle_plugin_ui,
     toggle_save_metadata_handler,
     update_plugin_config_handler,
@@ -41,7 +43,9 @@ from .tokenizer import (
 __all__ = [
     # Generation handlers
     "generate_image",
+    "get_available_models",
     "set_aspect_ratio",
+    "switch_model_handler",
     "toggle_plugin_ui",
     "toggle_save_metadata_handler",
     "update_plugin_config_handler",

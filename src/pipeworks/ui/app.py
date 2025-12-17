@@ -13,6 +13,7 @@ from .handlers import (
     apply_gallery_filter,
     build_combined_prompt,
     generate_image,
+    get_available_models,
     initialize_gallery_browser,
     load_gallery_folder,
     move_favorites_to_catalog,
@@ -21,6 +22,7 @@ from .handlers import (
     select_gallery_image,
     set_aspect_ratio,
     switch_gallery_root,
+    switch_model_handler,
     toggle_favorite,
     toggle_metadata_format,
     toggle_save_metadata_handler,
@@ -64,7 +66,7 @@ def create_ui() -> tuple[gr.Blocks, str]:
         gr.Markdown(
             """
             # Pipeworks Image Generator
-            ### Programmatic image generation with Z-Image-Turbo
+            ### Multi-model AI image generation and editing
             """
         )
 
@@ -102,6 +104,20 @@ def create_generation_tab(ui_state):
         with gr.Column(scale=1):
             # Input controls
             gr.Markdown("### Generation Settings")
+
+            # Model Selection
+            with gr.Row():
+                model_dropdown = gr.Dropdown(
+                    label="Model",
+                    choices=get_available_models(),
+                    value=config.default_model_adapter,
+                    info="Select AI model for generation",
+                    scale=3,
+                )
+                model_status = gr.Markdown(
+                    value=f"✅ **Current:** {config.default_model_adapter}",
+                    scale=2,
+                )
 
             prompt_input = gr.Textbox(
                 label="Prompt",
@@ -263,6 +279,13 @@ def create_generation_tab(ui_state):
                             ],
                             outputs=[ui_state],
                         )
+
+            # Model selection event handler
+            model_dropdown.change(
+                fn=switch_model_handler,
+                inputs=[model_dropdown, ui_state],
+                outputs=[model_status, ui_state],
+            )
 
             generate_btn = gr.Button(
                 "Generate Image",

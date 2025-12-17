@@ -6,9 +6,10 @@ import random
 import gradio as gr
 
 from pipeworks.core.config import config
+from pipeworks.core.model_adapters import model_registry
 
 from ..models import ASPECT_RATIOS, MAX_SEED, GenerationParams, SegmentConfig, UIState
-from ..state import initialize_ui_state
+from ..state import initialize_ui_state, switch_model
 from ..state import toggle_plugin as toggle_plugin_state
 from ..validation import (
     ValidationError,
@@ -18,6 +19,45 @@ from ..validation import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def switch_model_handler(model_name: str, state: UIState) -> tuple[str, UIState]:
+    """Handle model switching from the UI.
+
+    Args:
+        model_name: Name of the model adapter to switch to
+        state: UI state
+
+    Returns:
+        Tuple of (status_message, updated_state)
+    """
+    try:
+        logger.info(f"UI requesting model switch to: {model_name}")
+
+        # Check if already using this model
+        if state.current_model_name == model_name:
+            return f"✅ Already using {model_name}", state
+
+        # Switch the model
+        state = switch_model(state, model_name)
+
+        success_msg = f"✅ Successfully switched to **{model_name}**"
+        logger.info(f"Model switch successful: {model_name}")
+        return success_msg, state
+
+    except Exception as e:
+        logger.error(f"Failed to switch model: {e}", exc_info=True)
+        error_msg = f"❌ Failed to switch model: {str(e)}"
+        return error_msg, state
+
+
+def get_available_models() -> list[str]:
+    """Get list of available model adapters.
+
+    Returns:
+        List of model adapter names
+    """
+    return model_registry.list_available()
 
 
 def set_aspect_ratio(ratio_name: str) -> tuple[gr.Number, gr.Number]:
