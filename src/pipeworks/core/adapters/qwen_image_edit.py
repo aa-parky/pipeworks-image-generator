@@ -1,25 +1,28 @@
 """Qwen-Image-Edit model adapter.
 
-This module provides the adapter for the Qwen-Image-Edit model, which performs
+This module provides the adapter for the Qwen-Image-Edit-2509 model, which performs
 instruction-based image editing. Unlike text-to-image models, this takes an
 existing image and modifies it based on natural language instructions.
 
 Qwen-Image-Edit Specifics
 --------------------------
-The Qwen-Image-Edit model is designed for:
+The Qwen-Image-Edit-2509 model is designed for:
 - **Instruction-based editing**: Modify images using natural language
 - **Contextual understanding**: Understands complex editing instructions
 - **Preservation**: Maintains aspects of the image not mentioned in instruction
 - **Multi-modal**: Combines vision and language understanding
+- **Multi-image support**: Can composite up to 3 images together
 
 Model Parameters
 ----------------
 Key parameters for this model:
-- **input_image**: Source image to edit (PIL Image)
-- **instruction**: Natural language editing instruction
+- **image**: Source image(s) to edit (PIL Image or list of PIL Images)
+- **prompt**: Natural language editing instruction
 - **seed**: Random seed for reproducibility
 - **num_inference_steps**: Number of denoising steps (typically 20-50)
-- **guidance_scale**: Controls adherence to instruction (typically 7.5)
+- **guidance_scale**: Controls adherence to instruction (typically 1.0)
+- **true_cfg_scale**: Controls consistency preservation (typically 4.0)
+- **negative_prompt**: Things to avoid in output
 
 Usage Example
 -------------
@@ -53,11 +56,12 @@ See Also
 """
 
 import logging
+import time
+import torch
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
-import torch
-from diffusers import AutoPipelineForImage2Image
 from PIL import Image
 
 from pipeworks.core.config import PipeworksConfig
@@ -68,9 +72,9 @@ logger = logging.getLogger(__name__)
 
 
 class QwenImageEditAdapter(ModelAdapterBase):
-    """Model adapter for Qwen-Image-Edit instruction-based image editing.
+    """Model adapter for Qwen-Image-Edit-2509 instruction-based image editing.
 
-    This adapter wraps the Qwen-Image-Edit model pipeline, providing
+    This adapter wraps the Qwen-Image-Edit-2509 model pipeline, providing
     instruction-based image editing capabilities. It takes an existing image
     and modifies it based on natural language instructions.
 
@@ -87,7 +91,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
         Always "image-edit"
     config : PipeworksConfig
         Configuration object containing model and generation settings
-    pipe : AutoPipelineForImage2Image | None
+    pipe : QwenImageEditPlusPipeline | None
         HuggingFace Diffusers pipeline (None until loaded)
     plugins : list[PluginBase]
         List of active plugin instances
@@ -96,9 +100,10 @@ class QwenImageEditAdapter(ModelAdapterBase):
     -----
     - Model loading can take 20-40 seconds depending on hardware
     - Model cache is stored in config.models_dir
-    - Model size varies (check HuggingFace model card)
-    - First generation after loading takes longer due to initialization
-    - Unlike text-to-image models, this requires an input image
+    - Full model size: ~57.7GB (bfloat16 precision)
+    - First generation after loading takes longer due to CUDA compilation
+    - Supports single or multi-image editing (up to 3 images)
+    - Requires VRAM: 12-16GB (bfloat16), 24GB (float32)
 
     Examples
     --------
@@ -126,35 +131,101 @@ class QwenImageEditAdapter(ModelAdapterBase):
     """
 
     name = "Qwen-Image-Edit"
-    description = "Instruction-based image editing with Qwen-Image-Edit"
+    description = "Instruction-based image editing with Qwen-Image-Edit-2509"
     model_type = "image-edit"
-    version = "1.0.0"
+    version = "2.0.0"
 
     def __init__(
-        self, config: PipeworksConfig, plugins: list[PluginBase] | None = None
+        self, config: PipeworksConfig, plugins: Optional[list[PluginBase]] = None
     ) -> None:
         """Initialize the Qwen-Image-Edit adapter.
 
         Args:
             config: Configuration object containing model settings
             plugins: List of plugin instances to use
+
+        Notes:
+            - Model is not loaded until first generation call
+            - Configuration is validated on initialization
         """
         super().__init__(config, plugins)
-        self.pipe: AutoPipelineForImage2Image | None = None
+        self.pipe = None
         self._model_loaded = False
 
-        # Get model ID from config (should be in PIPEWORKS_QWEN_MODEL_ID env var)
+        # Get model ID from config
         self.model_id = getattr(
             config, "qwen_model_id", "Qwen/Qwen-Image-Edit-2509"
         )
         logger.info(f"Configured Qwen-Image-Edit with model: {self.model_id}")
 
+    def _clear_gpu_memory(self) -> None:
+        """Clear GPU memory cache.
+
+        This should be called before and after inference to ensure
+        memory is properly freed between operations.
+        """
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
+    def _preprocess_image(
+        self, image: Image.Image, max_size: int = 1024
+    ) -> Image.Image:
+        """Preprocess image for inference.
+
+        Handles:
+        - Resizing large images to prevent OOM
+        - Converting to RGB format
+        - Ensuring proper dimensions
+
+        Args:
+            image: Input PIL Image
+            max_size: Maximum dimension size (default 1024)
+
+        Returns:
+            Preprocessed PIL Image
+
+        Notes:
+            - Images larger than max_size are resized while maintaining aspect ratio
+            - Non-RGB images are converted to RGB
+            - Resizing uses high-quality LANCZOS resampling
+        """
+        try:
+            # Auto-orient based on EXIF data if available
+            try:
+                from PIL import ImageOps
+                image = ImageOps.exif_transpose(image)
+            except Exception:
+                pass
+
+            # Resize if too large
+            if max(image.size) > max_size:
+                original_size = image.size
+                image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                logger.info(
+                    f"Resized image from {original_size} to {image.size}"
+                )
+
+            # Convert to RGB if necessary
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+                logger.info(f"Converted image mode to RGB")
+
+            return image
+
+        except Exception as e:
+            logger.error(f"Error preprocessing image: {e}")
+            raise
+
     def load_model(self) -> None:
-        """Load the Qwen-Image-Edit model into memory.
+        """Load the Qwen-Image-Edit-2509 model into memory.
 
         This method downloads the model from HuggingFace (if not cached),
         loads it into memory with the configured dtype, moves it to the
-        target device, and applies any configured optimizations.
+        target device, and applies configured optimizations.
+
+        The specific QwenImageEditPlusPipeline class is used (not generic
+        AutoPipeline) to ensure compatibility with all Qwen-specific features.
 
         Raises
         ------
@@ -163,61 +234,74 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
         Notes
         -----
-        - First load downloads model files from HuggingFace
+        - First load downloads ~57.7GB from HuggingFace
         - Subsequent loads use cache in config.models_dir
-        - Model compilation (if enabled) may add time to first load
+        - CUDA compilation on first inference adds ~5-10 seconds
+        - Model is moved to GPU unless CPU offload is enabled
         """
         if self._model_loaded:
             logger.info("Qwen-Image-Edit model already loaded, skipping...")
             return
 
         logger.info(f"Loading Qwen-Image-Edit model {self.model_id}...")
+        logger.info(f"Device: {self.config.device}, Dtype: {self.config.torch_dtype}")
 
         try:
+            # Import the specific pipeline class for Qwen
+            from diffusers import QwenImageEditPlusPipeline
+
             # Map dtype string to torch dtype enum
             dtype_map = {
                 "bfloat16": torch.bfloat16,
                 "float16": torch.float16,
                 "float32": torch.float32,
             }
-            torch_dtype = dtype_map[self.config.torch_dtype]
+            torch_dtype = dtype_map.get(self.config.torch_dtype, torch.bfloat16)
+
+            logger.info(f"Using torch dtype: {torch_dtype}")
 
             # Load pipeline from HuggingFace Hub (or local cache)
-            # Using AutoPipeline to automatically detect the correct pipeline type
-            self.pipe = AutoPipelineForImage2Image.from_pretrained(
+            # Use QwenImageEditPlusPipeline specifically (not AutoPipeline)
+            self.pipe = QwenImageEditPlusPipeline.from_pretrained(
                 self.model_id,
                 torch_dtype=torch_dtype,
-                low_cpu_mem_usage=False,
+                low_cpu_mem_usage=True,  # Reduces VRAM during loading
                 cache_dir=str(self.config.models_dir),
+                trust_remote_code=True,
             )
+
+            logger.info("Pipeline loaded successfully")
 
             # Move model to target device
             if not self.config.enable_model_cpu_offload:
+                logger.info(f"Moving model to device: {self.config.device}")
                 self.pipe.to(self.config.device)
             else:
+                logger.info("Enabling model CPU offloading")
                 self.pipe.enable_model_cpu_offload()
-                logger.info("Enabled model CPU offloading")
 
             # Apply performance optimizations
             if self.config.enable_attention_slicing:
+                logger.info("Enabling attention slicing")
                 self.pipe.enable_attention_slicing()
-                logger.info("Enabled attention slicing")
+
+            # Try to enable memory-efficient attention if available
+            try:
+                self.pipe.enable_xformers_memory_efficient_attention()
+                logger.info("Enabled xformers memory-efficient attention")
+            except Exception as e:
+                logger.debug(f"Could not enable xformers: {e}")
 
             # Use alternative attention backend if configured
             if self.config.attention_backend != "default":
-                # Note: Not all pipelines support all attention backends
                 try:
-                    if hasattr(self.pipe, "unet"):
-                        self.pipe.unet.set_attention_backend(
-                            self.config.attention_backend
-                        )
-                    elif hasattr(self.pipe, "transformer"):
+                    if hasattr(self.pipe, "transformer"):
                         self.pipe.transformer.set_attention_backend(
                             self.config.attention_backend
                         )
-                    logger.info(
-                        f"Set attention backend to: {self.config.attention_backend}"
-                    )
+                        logger.info(
+                            f"Set attention backend to: {self.config.attention_backend}"
+                        )
                 except Exception as e:
                     logger.warning(
                         f"Could not set attention backend: {e}. Continuing with default."
@@ -226,6 +310,12 @@ class QwenImageEditAdapter(ModelAdapterBase):
             self._model_loaded = True
             logger.info("Qwen-Image-Edit model loaded successfully!")
 
+        except ImportError as e:
+            logger.error(
+                f"Failed to import QwenImageEditPlusPipeline: {e}. "
+                "Ensure diffusers is installed: pip install diffusers>=0.28.0"
+            )
+            raise
         except Exception as e:
             logger.error(f"Failed to load Qwen-Image-Edit model: {e}")
             raise
@@ -234,20 +324,22 @@ class QwenImageEditAdapter(ModelAdapterBase):
         self,
         input_image: Image.Image,
         instruction: str,
-        num_inference_steps: int | None = None,
-        guidance_scale: float = 7.5,
-        seed: int | None = None,
-        strength: float = 0.8,
+        num_inference_steps: Optional[int] = None,
+        guidance_scale: float = 1.0,
+        true_cfg_scale: float = 4.0,
+        seed: Optional[int] = None,
+        negative_prompt: str = " ",
     ) -> Image.Image:
         """Edit an image based on a natural language instruction.
 
         Args:
             input_image: Source PIL Image to edit
             instruction: Natural language instruction for the edit
-            num_inference_steps: Number of denoising steps (default 30)
-            guidance_scale: How closely to follow instruction (default 7.5)
+            num_inference_steps: Number of denoising steps (default 40)
+            guidance_scale: How closely to follow instruction (default 1.0)
+            true_cfg_scale: Consistency preservation strength (default 4.0)
             seed: Random seed for reproducibility (None for random)
-            strength: How much to transform the image (0.0-1.0, default 0.8)
+            negative_prompt: Things to avoid in output (default " ")
 
         Returns
         -------
@@ -256,17 +348,19 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
         Raises
         ------
-        Exception
-            If generation fails
         ValueError
             If input_image is not provided or invalid
+        Exception
+            If generation fails
 
         Notes
         -----
         - If model is not loaded, it will be loaded automatically
-        - strength controls how much the image changes (1.0 = maximum change)
-        - guidance_scale controls adherence to instruction (higher = stricter)
+        - Input image is automatically resized if > 1024px
+        - guidance_scale controls prompt adherence (1.0 is typical)
+        - true_cfg_scale controls identity/consistency preservation
         - Same inputs + seed = same output (reproducible)
+        - First inference after loading takes longer due to CUDA compilation
         """
         if not self._model_loaded:
             self.load_model()
@@ -274,50 +368,76 @@ class QwenImageEditAdapter(ModelAdapterBase):
         if input_image is None:
             raise ValueError("input_image is required for image editing")
 
-        # Use reasonable defaults for image editing
-        num_inference_steps = num_inference_steps or 30
+        if not instruction or not instruction.strip():
+            raise ValueError("instruction is required for image editing")
+
+        # Use reasonable defaults
+        num_inference_steps = num_inference_steps or 40
 
         logger.info(
             f"Editing image: steps={num_inference_steps}, "
-            f"guidance={guidance_scale}, strength={strength}, seed={seed}"
+            f"guidance={guidance_scale}, true_cfg={true_cfg_scale}, seed={seed}"
         )
         logger.info(f"Instruction: {instruction}")
 
-        # Create generator for reproducibility
-        generator = None
-        if seed is not None:
-            generator = torch.Generator(self.config.device).manual_seed(seed)
-
         try:
-            # Generate edited image
-            # Note: The exact parameter names may vary depending on the specific
-            # pipeline implementation. Adjust if needed based on Qwen's API.
-            output = self.pipe(
-                prompt=instruction,  # Some pipelines use 'prompt' for instruction
-                image=input_image,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-                strength=strength,
-                generator=generator,
+            # Clear GPU memory before inference
+            self._clear_gpu_memory()
+
+            # Preprocess input image
+            processed_image = self._preprocess_image(input_image)
+
+            # Create generator for reproducibility
+            generator = None
+            if seed is not None:
+                generator = torch.Generator(self.config.device).manual_seed(seed)
+
+            # Measure inference time
+            start_time = time.time()
+
+            # Run inference with proper parameters for Qwen-Image-Edit-2509
+            with torch.inference_mode():
+                output = self.pipe(
+                    image=[processed_image],  # Must be a list
+                    prompt=instruction,
+                    num_inference_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    true_cfg_scale=true_cfg_scale,
+                    negative_prompt=negative_prompt,
+                    generator=generator,
+                    num_images_per_prompt=1,
+                )
+
+            inference_time = time.time() - start_time
+
+            # Extract output image
+            image = output.images[0]
+
+            logger.info(
+                f"Image edited successfully in {inference_time:.2f}s. "
+                f"Output size: {image.size}"
             )
 
-            image = output.images[0]
-            logger.info("Image edited successfully!")
             return image
 
         except Exception as e:
             logger.error(f"Failed to edit image: {e}")
             raise
 
+        finally:
+            # Always clear GPU memory after inference
+            self._clear_gpu_memory()
+
     def generate_and_save(
         self,
         input_image: Image.Image,
         instruction: str,
-        num_inference_steps: int | None = None,
-        guidance_scale: float = 7.5,
-        seed: int | None = None,
-        strength: float = 0.8,
-        output_path: Path | None = None,
+        num_inference_steps: Optional[int] = None,
+        guidance_scale: float = 1.0,
+        true_cfg_scale: float = 4.0,
+        seed: Optional[int] = None,
+        negative_prompt: str = " ",
+        output_path: Optional[Path] = None,
     ) -> tuple[Image.Image, Path]:
         """Edit an image and save it to disk with plugin hooks.
 
@@ -335,8 +455,9 @@ class QwenImageEditAdapter(ModelAdapterBase):
             instruction: Natural language instruction for the edit
             num_inference_steps: Number of denoising steps
             guidance_scale: How closely to follow instruction
+            true_cfg_scale: Consistency preservation strength
             seed: Random seed for reproducibility
-            strength: How much to transform the image (0.0-1.0)
+            negative_prompt: Things to avoid in output
             output_path: Custom output path (if None, auto-generates)
 
         Returns
@@ -348,102 +469,93 @@ class QwenImageEditAdapter(ModelAdapterBase):
         ------
         Exception
             If editing or save fails
+
+        Notes
+        -----
+        - Plugins can modify parameters and output
+        - Output path is auto-generated if not provided
+        - Auto-generated paths use timestamp and instruction prefix
+        - Plugins are called in registration order
         """
-        # Use reasonable defaults
-        num_inference_steps = num_inference_steps or 30
-
-        # Build params dict for plugins
-        params = {
-            "instruction": instruction,
-            "prompt": instruction,  # Alias for compatibility
-            "num_inference_steps": num_inference_steps,
-            "guidance_scale": guidance_scale,
-            "strength": strength,
-            "seed": seed,
-            "model_id": self.model_id,
-            "model_name": self.name,
-            "input_image_size": input_image.size if input_image else None,
-        }
-
-        # Plugin Hook 1: on_generate_start
+        # Call plugin hooks for generation start
         for plugin in self.plugins:
-            if plugin.enabled:
-                params = plugin.on_generate_start(params)
+            if hasattr(plugin, "on_generate_start"):
+                plugin.on_generate_start(
+                    adapter=self,
+                    input_image=input_image,
+                    instruction=instruction,
+                    num_inference_steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    seed=seed,
+                )
 
-        # Generate edited image using potentially modified params
-        image = self.generate(
+        # Edit image
+        edited_image = self.generate(
             input_image=input_image,
-            instruction=params["instruction"],
-            num_inference_steps=params["num_inference_steps"],
-            guidance_scale=params["guidance_scale"],
-            strength=params["strength"],
-            seed=params["seed"],
+            instruction=instruction,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            true_cfg_scale=true_cfg_scale,
+            seed=seed,
+            negative_prompt=negative_prompt,
         )
 
-        # Plugin Hook 2: on_generate_complete
+        # Call plugin hooks for generation complete
         for plugin in self.plugins:
-            if plugin.enabled:
-                image = plugin.on_generate_complete(image, params)
+            if hasattr(plugin, "on_generate_complete"):
+                edited_image = plugin.on_generate_complete(
+                    adapter=self,
+                    image=edited_image,
+                    instruction=instruction,
+                ) or edited_image
 
-        # Generate output filename if not provided
-        # Format: pipeworks_edit_YYYYMMDD_HHMMSS_seed{seed}.png
+        # Determine output path
         if output_path is None:
+            # Auto-generate path with timestamp and instruction prefix
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            seed_suffix = f"_seed{params['seed']}" if params["seed"] is not None else ""
-            filename = f"pipeworks_edit_{timestamp}{seed_suffix}.png"
+            # Use first 30 chars of instruction, sanitized
+            instruction_prefix = (
+                instruction[:30]
+                .replace(" ", "_")
+                .replace("/", "_")
+                .replace("\\", "_")
+            )
+            filename = f"qwen_edit_{timestamp}_{instruction_prefix}.png"
             output_path = self.config.outputs_dir / filename
+        else:
+            output_path = Path(output_path)
 
-        # Ensure parent directory exists
+        # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Plugin Hook 3: on_before_save
+        # Call plugin hooks for before save
         for plugin in self.plugins:
-            if plugin.enabled:
-                image, output_path = plugin.on_before_save(image, output_path, params)
+            if hasattr(plugin, "on_before_save"):
+                edited_image, output_path = plugin.on_before_save(
+                    adapter=self,
+                    image=edited_image,
+                    output_path=output_path,
+                ) or (edited_image, output_path)
 
-        # Save image to disk
-        image.save(output_path)
-        logger.info(f"Edited image saved to: {output_path}")
+        # Save image
+        try:
+            edited_image.save(output_path, "PNG")
+            logger.info(f"Image saved to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to save image: {e}")
+            raise
 
-        # Plugin Hook 4: on_after_save
+        # Call plugin hooks for after save
         for plugin in self.plugins:
-            if plugin.enabled:
-                plugin.on_after_save(image, output_path, params)
+            if hasattr(plugin, "on_after_save"):
+                plugin.on_after_save(
+                    adapter=self,
+                    image=edited_image,
+                    output_path=output_path,
+                )
 
-        return image, output_path
-
-    def unload_model(self) -> None:
-        """Unload the Qwen-Image-Edit model from memory.
-
-        This method:
-        1. Deletes the pipeline instance
-        2. Clears CUDA cache if using GPU
-        3. Resets the loaded flag
-        4. Logs unload success
-        """
-        if self._model_loaded:
-            logger.info("Unloading Qwen-Image-Edit model...")
-            del self.pipe
-            self.pipe = None
-            self._model_loaded = False
-
-            # Clear CUDA cache
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-            logger.info("Qwen-Image-Edit model unloaded successfully")
-
-    @property
-    def is_loaded(self) -> bool:
-        """Check if the model is currently loaded.
-
-        Returns
-        -------
-        bool
-            True if model is loaded, False otherwise
-        """
-        return self._model_loaded
+        return edited_image, output_path
 
 
-# Register the adapter with the global model registry
+# Register adapter
 model_registry.register(QwenImageEditAdapter)
