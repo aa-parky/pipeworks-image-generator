@@ -555,7 +555,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
             raise ValueError("Maximum of 3 input images supported")
 
         # Use reasonable defaults
-        num_inference_steps = num_inference_steps or 40
+        num_inference_steps = num_inference_steps or 20
 
         logger.info(
             f"Editing {len(images)} image(s): steps={num_inference_steps}, "
