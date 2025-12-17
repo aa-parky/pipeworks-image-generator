@@ -199,6 +199,13 @@ def switch_model(state: UIState, model_name: str) -> UIState:
             logger.info(f"Unloading current model: {state.current_model_name}")
             state.model_adapter.unload_model()
 
+            # Aggressive CUDA memory cleanup
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                logger.info("Cleared CUDA cache")
+
         # Get list of current plugins to transfer
         current_plugins = list(state.active_plugins.values())
 

@@ -119,6 +119,18 @@ def generate_image(
         # Initialize state
         state = initialize_ui_state(state)
 
+        # Check if current model supports text-to-image generation
+        if state.model_adapter.model_type != "text-to-image":
+            error_msg = (
+                f"❌ **Model Type Mismatch**\n\n"
+                f"The current model **{state.current_model_name}** is a "
+                f"**{state.model_adapter.model_type}** model.\n\n"
+                f"This UI generation flow currently only supports **text-to-image** models.\n\n"
+                f"Please switch to **Z-Image-Turbo** using the model dropdown above, "
+                f"or use the programmatic API for image editing workflows."
+            )
+            return [], error_msg, str(seed), state
+
         # Create GenerationParams and validate
         params = GenerationParams(
             prompt=prompt,
