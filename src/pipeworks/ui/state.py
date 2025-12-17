@@ -1,4 +1,8 @@
-"""State management utilities for Pipeworks UI."""
+"""State management utilities for Pipeworks UI.
+
+This module handles the initialization and management of UI state, including
+model adapters, plugins, and other session components.
+"""
 
 import logging
 
@@ -6,7 +10,8 @@ from pipeworks.core.catalog_manager import CatalogManager
 from pipeworks.core.config import config
 from pipeworks.core.favorites_db import FavoritesDB
 from pipeworks.core.gallery_browser import GalleryBrowser
-from pipeworks.core.pipeline import ImageGenerator
+from pipeworks.core.model_adapters import model_registry
+from pipeworks.core.pipeline import ImageGenerator  # Legacy support
 from pipeworks.core.prompt_builder import PromptBuilder
 from pipeworks.core.tokenizer import TokenizerAnalyzer
 
@@ -15,15 +20,16 @@ from .models import UIState
 logger = logging.getLogger(__name__)
 
 
-def initialize_ui_state(state: UIState | None = None) -> UIState:
+def initialize_ui_state(state: UIState | None = None, model_name: str | None = None) -> UIState:
     """Initialize or ensure UI state is ready.
 
     This function handles lazy initialization of the UI state components.
     If state is None or uninitialized, it creates and loads all necessary
-    components (generator, tokenizer, prompt builder).
+    components (model adapter, tokenizer, prompt builder).
 
     Args:
         state: Existing UIState or None
+        model_name: Name of model adapter to use (default: from config)
 
     Returns:
         Initialized UIState instance
@@ -33,6 +39,14 @@ def initialize_ui_state(state: UIState | None = None) -> UIState:
         logger.info("Creating new UIState")
         state = UIState()
 
+    # Set model name if provided
+    if model_name:
+        state.current_model_name = model_name
+
+    # Use default from config if not set
+    if not state.current_model_name:
+        state.current_model_name = config.default_model_adapter
+
     # Check if already initialized
     if state.is_initialized():
         logger.debug("UIState already initialized")
@@ -41,17 +55,22 @@ def initialize_ui_state(state: UIState | None = None) -> UIState:
     logger.info("Initializing UIState components...")
 
     try:
-        # Initialize generator
-        if state.generator is None:
-            logger.info("Initializing ImageGenerator")
-            state.generator = ImageGenerator(config, plugins=[])
+        # Initialize model adapter
+        if state.model_adapter is None:
+            logger.info(f"Initializing model adapter: {state.current_model_name}")
+            state.model_adapter = model_registry.instantiate(
+                state.current_model_name, config, plugins=[]
+            )
             # Pre-load model
             try:
-                state.generator.load_model()
+                state.model_adapter.load_model()
                 logger.info("Model pre-loaded successfully")
             except Exception as e:
                 logger.error(f"Failed to pre-load model: {e}")
                 logger.warning("Model will be loaded on first generation attempt")
+
+        # Maintain backward compatibility: set generator as alias to model_adapter
+        state.generator = state.model_adapter
 
         # Initialize tokenizer analyzer
         if state.tokenizer_analyzer is None:
@@ -98,24 +117,28 @@ def initialize_ui_state(state: UIState | None = None) -> UIState:
 
 
 def update_generator_plugins(state: UIState) -> UIState:
-    """Update the generator's plugin list from active_plugins.
+    """Update the model adapter's plugin list from active_plugins.
 
     Args:
-        state: UI state containing generator and active_plugins
+        state: UI state containing model_adapter and active_plugins
 
     Returns:
         Updated state
     """
-    if state.generator is None:
-        logger.warning("Cannot update plugins: generator not initialized")
+    if state.model_adapter is None:
+        logger.warning("Cannot update plugins: model adapter not initialized")
         return state
 
     # Get list of enabled plugins
     enabled_plugins = [plugin for plugin in state.active_plugins.values() if plugin.enabled]
 
-    # Update generator's plugin list
-    state.generator.plugins = enabled_plugins
-    logger.info(f"Updated generator with {len(enabled_plugins)} active plugins")
+    # Update model adapter's plugin list
+    state.model_adapter.plugins = enabled_plugins
+    logger.info(f"Updated model adapter with {len(enabled_plugins)} active plugins")
+
+    # Maintain backward compatibility
+    if state.generator is not None:
+        state.generator.plugins = enabled_plugins
 
     return state
 
@@ -152,6 +175,64 @@ def toggle_plugin(state: UIState, plugin_name: str, enabled: bool, **plugin_conf
     return state
 
 
+def switch_model(state: UIState, model_name: str) -> UIState:
+    """Switch to a different model adapter.
+
+    This function unloads the current model and loads a new one.
+    Plugins are preserved and attached to the new model adapter.
+
+    Args:
+        state: UI state
+        model_name: Name of the model adapter to switch to
+
+    Returns:
+        Updated state with new model adapter
+
+    Raises:
+        Exception: If model switching fails
+    """
+    logger.info(f"Switching model from {state.current_model_name} to {model_name}")
+
+    try:
+        # Unload current model if loaded
+        if state.model_adapter is not None:
+            logger.info(f"Unloading current model: {state.current_model_name}")
+            state.model_adapter.unload_model()
+
+        # Get list of current plugins to transfer
+        current_plugins = list(state.active_plugins.values())
+
+        # Instantiate new model adapter with current plugins
+        logger.info(f"Loading new model: {model_name}")
+        state.model_adapter = model_registry.instantiate(
+            model_name, config, plugins=current_plugins
+        )
+
+        # Load the model
+        state.model_adapter.load_model()
+
+        # Update state
+        state.current_model_name = model_name
+        state.generator = state.model_adapter  # Maintain backward compatibility
+
+        logger.info(f"Successfully switched to model: {model_name}")
+        return state
+
+    except Exception as e:
+        logger.error(f"Failed to switch model: {e}")
+        # Attempt to restore previous model if switch failed
+        logger.warning("Attempting to restore previous model...")
+        try:
+            state.model_adapter = model_registry.instantiate(
+                state.current_model_name, config, plugins=[]
+            )
+            state.model_adapter.load_model()
+            logger.info("Previous model restored")
+        except Exception as restore_error:
+            logger.error(f"Failed to restore previous model: {restore_error}")
+        raise
+
+
 def cleanup_ui_state(state: UIState) -> None:
     """Clean up UI state resources.
 
@@ -163,16 +244,17 @@ def cleanup_ui_state(state: UIState) -> None:
     logger.info("Cleaning up UIState resources")
 
     try:
-        # Unload model if generator exists
-        if state.generator is not None:
+        # Unload model if model adapter exists
+        if state.model_adapter is not None:
             try:
-                state.generator.unload_model()
+                state.model_adapter.unload_model()
                 logger.info("Model unloaded successfully")
             except Exception as e:
                 logger.error(f"Error unloading model: {e}")
 
         # Clear references
-        state.generator = None
+        state.model_adapter = None
+        state.generator = None  # Also clear legacy reference
         state.tokenizer_analyzer = None
         state.prompt_builder = None
         state.gallery_browser = None

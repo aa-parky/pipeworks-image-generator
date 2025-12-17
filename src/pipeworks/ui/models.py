@@ -113,9 +113,37 @@ class UIState:
     This represents all the stateful objects that need to be maintained
     per user session. Each user gets their own UIState instance to ensure
     thread safety and isolation.
+
+    Attributes
+    ----------
+    model_adapter : Any | None
+        Current model adapter instance (ModelAdapterBase)
+    current_model_name : str
+        Name of the currently selected model adapter
+    generator : Any | None
+        [DEPRECATED] Legacy ImageGenerator instance (for backward compatibility)
+    tokenizer_analyzer : Any | None
+        TokenizerAnalyzer instance for prompt analysis
+    prompt_builder : Any | None
+        PromptBuilder instance for file-based prompts
+    active_plugins : dict[str, Any]
+        Dictionary of active plugin instances
+    gallery_browser : Any | None
+        GalleryBrowser instance for image browsing
+    favorites_db : Any | None
+        FavoritesDB instance for tracking favorites
+    catalog_manager : Any | None
+        CatalogManager instance for archiving favorites
     """
 
-    generator: Any | None = None  # ImageGenerator instance
+    # Model adapter (new architecture)
+    model_adapter: Any | None = None  # ModelAdapterBase instance
+    current_model_name: str = "Z-Image-Turbo"  # Currently selected model
+
+    # Legacy generator (for backward compatibility)
+    generator: Any | None = None  # ImageGenerator instance (deprecated)
+
+    # Core components
     tokenizer_analyzer: Any | None = None  # TokenizerAnalyzer instance
     prompt_builder: Any | None = None  # PromptBuilder instance
     active_plugins: dict[str, Any] = field(default_factory=dict)  # Dict[str, PluginBase]
@@ -137,10 +165,10 @@ class UIState:
         """Check if the state has been initialized with core components.
 
         Returns:
-            True if generator, tokenizer, and prompt builder are loaded
+            True if model_adapter, tokenizer, and prompt builder are loaded
         """
         return (
-            self.generator is not None
+            self.model_adapter is not None
             and self.tokenizer_analyzer is not None
             and self.prompt_builder is not None
         )
@@ -148,7 +176,9 @@ class UIState:
     def __repr__(self) -> str:
         """String representation for debugging."""
         return (
-            f"UIState(initialized={self.is_initialized()}, " f"plugins={len(self.active_plugins)})"
+            f"UIState(initialized={self.is_initialized()}, "
+            f"model={self.current_model_name}, "
+            f"plugins={len(self.active_plugins)})"
         )
 
 

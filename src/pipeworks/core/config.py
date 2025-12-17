@@ -82,9 +82,17 @@ class PipeworksConfig(BaseSettings):
 
     Attributes
     ----------
-    Model Settings:
+    Model Adapter Settings:
+        default_model_adapter : str
+            Default model adapter to use (Z-Image-Turbo, Qwen-Image-Edit, etc.)
+        zimage_model_id : str
+            HuggingFace model ID for Z-Image-Turbo
+        qwen_model_id : str
+            HuggingFace model ID for Qwen-Image-Edit
         model_id : str
-            HuggingFace model identifier for Z-Image-Turbo
+            [LEGACY] HuggingFace model ID for backward compatibility
+
+    General Model Settings:
         torch_dtype : Literal["bfloat16", "float16", "float32"]
             Torch dtype for model inference (bfloat16 recommended)
         device : str
@@ -134,23 +142,29 @@ class PipeworksConfig(BaseSettings):
     - Configuration is immutable after initialization
     - To modify config, set environment variables and restart the application
     - See .env.example for a complete list of configuration options
+    - Multiple models are now supported through the model adapter system
 
     Examples
     --------
+    Using model adapters (recommended):
+
+        >>> from pipeworks.core.config import config
+        >>> from pipeworks.core import model_registry
+        >>> adapter = model_registry.instantiate("Z-Image-Turbo", config)
+
     Create a custom configuration:
 
-        >>> from pipeworks.core.config import PipeworksConfig
         >>> custom_config = PipeworksConfig(
-        ...     model_id="custom/model",
+        ...     default_model_adapter="Qwen-Image-Edit",
         ...     device="cpu",
-        ...     num_inference_steps=12
+        ...     num_inference_steps=30
         ... )
 
     Use the global configuration instance:
 
         >>> from pipeworks.core.config import config
-        >>> print(config.model_id)
-        'Tongyi-MAI/Z-Image-Turbo'
+        >>> print(config.default_model_adapter)
+        'Z-Image-Turbo'
     """
 
     model_config = SettingsConfigDict(
@@ -160,11 +174,29 @@ class PipeworksConfig(BaseSettings):
         case_sensitive=False,
     )
 
-    # Model settings
+    # Model adapter settings
+    default_model_adapter: str = Field(
+        default="Z-Image-Turbo",
+        description="Default model adapter to use (Z-Image-Turbo, Qwen-Image-Edit, etc.)",
+    )
+
+    # Legacy model settings (for backward compatibility with ImageGenerator)
     model_id: str = Field(
         default="Tongyi-MAI/Z-Image-Turbo",
-        description="HuggingFace model ID for image generation",
+        description="[LEGACY] HuggingFace model ID for image generation",
     )
+
+    # Model-specific HuggingFace IDs
+    zimage_model_id: str = Field(
+        default="Tongyi-MAI/Z-Image-Turbo",
+        description="HuggingFace model ID for Z-Image-Turbo",
+    )
+    qwen_model_id: str = Field(
+        default="Qwen/Qwen-Image-Edit-2509",
+        description="HuggingFace model ID for Qwen-Image-Edit",
+    )
+
+    # General model settings (shared across adapters)
     torch_dtype: Literal["bfloat16", "float16", "float32"] = Field(
         default="bfloat16",
         description="Torch dtype for model inference",
