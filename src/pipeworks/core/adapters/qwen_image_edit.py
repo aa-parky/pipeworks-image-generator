@@ -618,7 +618,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
         self,
         input_image: Image.Image,
         instruction: str,
-        num_inference_steps: Optional[int] = 25,
+        num_inference_steps: Optional[int] = None,
         guidance_scale: float = 1.0,
         true_cfg_scale: float = 4.0,
         seed: Optional[int] = None,
