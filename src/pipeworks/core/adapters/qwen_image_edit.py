@@ -104,11 +104,13 @@ class QwenImageEditAdapter(ModelAdapterBase):
     -----
     - Model loading can take 20-40 seconds depending on hardware
     - Model cache is stored in config.models_dir
-    - FP8 model size: ~20.4GB (fp8_e4m3fn quantized)
-    - Full model size: ~40.9GB (bfloat16 precision, if using official Qwen model)
+    - FP8 transformer size: ~20.4GB (fp8_e4m3fn quantized, aidiffuser repos)
+    - Full model size: ~57.7GB (bfloat16 precision, official Qwen model)
+    - **CPU offloading is automatically enabled for aidiffuser fp8 models**
+    - This allows the model to fit in 32GB VRAM by keeping some components in RAM
     - First generation after loading takes longer due to CUDA compilation
     - Supports single or multi-image editing (up to 3 images)
-    - Requires VRAM: 8-12GB (fp8), 12-16GB (bfloat16)
+    - Requires VRAM: 12-24GB (fp8 with CPU offload), 40GB+ (full model without offload)
 
     Examples
     --------
@@ -271,56 +273,66 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
             # Check if using aidiffuser fp8 model (only has weight files, no pipeline structure)
             if "aidiffuser" in self.model_id.lower():
-                logger.info("Detected aidiffuser repo - using hybrid loading approach")
-                logger.info("Loading pipeline structure from official Qwen repo...")
+                logger.info("Detected aidiffuser repo - using optimized fp8 loading")
+                logger.info("Step 1: Loading pipeline configs (no weights) from official Qwen repo...")
 
-                # Load full pipeline from official Qwen repo first
+                # Load ONLY the pipeline structure/configs from official Qwen (no weights loaded yet)
                 official_model_id = "Qwen/Qwen-Image-Edit-2509"
-                self.pipe = QwenImageEditPlusPipeline.from_pretrained(
-                    official_model_id,
-                    torch_dtype=torch_dtype,
-                    low_cpu_mem_usage=True,
-                    cache_dir=str(self.config.models_dir),
-                )
-                logger.info(f"Pipeline structure loaded from {official_model_id}")
 
-                # Now load fp8 transformer weights from aidiffuser
-                logger.info("Loading fp8 transformer weights from aidiffuser repo...")
+                # First, download just the config files (no model weights)
+                from huggingface_hub import snapshot_download
+                config_path = snapshot_download(
+                    repo_id=official_model_id,
+                    cache_dir=str(self.config.models_dir),
+                    allow_patterns=["*.json", "*.txt", "*.md"],  # Only download config files
+                    ignore_patterns=["*.safetensors", "*.bin", "*.pt"],  # Skip all weight files
+                )
+                logger.info(f"Downloaded pipeline configs from {official_model_id}")
+
+                # Now download the complete fp8 weights from aidiffuser
+                logger.info("Step 2: Downloading complete fp8 model weights from aidiffuser...")
                 from huggingface_hub import hf_hub_download
                 from safetensors.torch import load_file
 
-                # Download the fp8 safetensors file
                 fp8_weights_path = hf_hub_download(
                     repo_id=self.model_id,
                     filename="Qwen-Image-Edit-2509_fp8_e4m3fn.safetensors",
                     cache_dir=str(self.config.models_dir),
                 )
-                logger.info(f"Downloaded fp8 weights to: {fp8_weights_path}")
+                logger.info(f"Downloaded fp8 weights (20.4GB) to: {fp8_weights_path}")
 
-                # Load the fp8 weights
-                fp8_state_dict = load_file(fp8_weights_path)
-                logger.info(f"Loaded {len(fp8_state_dict)} keys from fp8 weights")
+                # Step 3: Load the complete fp8 weights and build pipeline
+                logger.info("Step 3: Loading complete fp8 model weights...")
+                fp8_state_dict = load_file(fp8_weights_path, device="cpu")
+                logger.info(f"Loaded {len(fp8_state_dict)} keys from fp8 safetensors")
 
-                # Load weights into the transformer
-                # The weights are for the transformer component
-                if hasattr(self.pipe, 'transformer'):
-                    # Filter keys that belong to the transformer
-                    transformer_keys = {k: v for k, v in fp8_state_dict.items()
-                                       if not k.startswith('vae.')
-                                       and not k.startswith('text_encoder.')}
-
-                    missing, unexpected = self.pipe.transformer.load_state_dict(
-                        transformer_keys, strict=False
+                # Try to use from_single_file if available (cleanest approach)
+                try:
+                    logger.info("Attempting from_single_file (most efficient method)...")
+                    self.pipe = QwenImageEditPlusPipeline.from_single_file(
+                        fp8_weights_path,
+                        config=config_path,
+                        torch_dtype=torch_dtype,
+                        low_cpu_mem_usage=True,
+                    )
+                    logger.info("✓ Successfully loaded via from_single_file")
+                except (AttributeError, NotImplementedError, TypeError, Exception) as e:
+                    logger.warning(f"from_single_file not supported: {type(e).__name__}")
+                    logger.error(
+                        f"Cannot load aidiffuser fp8 model efficiently. "
+                        f"To use Qwen-Image-Edit, please set in your .env file:\n"
+                        f"  PIPEWORKS_QWEN_MODEL_ID=Qwen/Qwen-Image-Edit-2509\n"
+                        f"Or use the official model which has full pipeline support."
+                    )
+                    raise RuntimeError(
+                        "Aidiffuser fp8 loading requires from_single_file() support. "
+                        "Use official Qwen/Qwen-Image-Edit-2509 model instead."
                     )
 
-                    if missing:
-                        logger.warning(f"Missing keys when loading fp8 weights: {len(missing)}")
-                    if unexpected:
-                        logger.warning(f"Unexpected keys when loading fp8 weights: {len(unexpected)}")
-
-                    logger.info("Successfully loaded fp8 weights into transformer")
-                else:
-                    logger.warning("Pipeline has no transformer attribute - using default weights")
+                # Clean up state dict from memory
+                import gc
+                del fp8_state_dict
+                gc.collect()
             else:
                 # Standard loading for official Qwen or other repos with full pipeline structure
                 logger.info("Loading from standard diffusers pipeline repo")
@@ -331,14 +343,40 @@ class QwenImageEditAdapter(ModelAdapterBase):
                     cache_dir=str(self.config.models_dir),
                 )
 
-            logger.info("Pipeline loaded successfully")
+            logger.info("Pipeline loaded successfully (on CPU)")
 
-            # Move model to target device
-            if not self.config.enable_model_cpu_offload:
-                logger.info(f"Moving model to device: {self.config.device}")
-                self.pipe.to(self.config.device)
-            else:
-                logger.info("Enabling model CPU offloading")
+            # Move model to target device with intelligent memory management
+            # Qwen is a large model (~57GB), so we default to CPU offloading for GPUs < 48GB
+            use_cpu_offload = self.config.enable_model_cpu_offload
+
+            # Auto-enable CPU offloading for large Qwen models on consumer GPUs
+            if not use_cpu_offload and torch.cuda.is_available():
+                # Get available VRAM (rough estimate)
+                try:
+                    total_vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # GB
+                    if total_vram < 48:  # Less than 48GB VRAM
+                        logger.info(f"Detected {total_vram:.1f}GB VRAM - enabling CPU offloading for Qwen")
+                        use_cpu_offload = True
+                except Exception:
+                    # If we can't check VRAM, default to CPU offloading for safety
+                    logger.warning("Could not check VRAM - defaulting to CPU offloading")
+                    use_cpu_offload = True
+
+            if not use_cpu_offload:
+                logger.info(f"Moving full model to device: {self.config.device}")
+                try:
+                    self.pipe.to(self.config.device)
+                except RuntimeError as e:
+                    if "out of memory" in str(e).lower():
+                        logger.warning(f"CUDA OOM when moving to GPU: {e}")
+                        logger.warning("Falling back to CPU offloading...")
+                        use_cpu_offload = True
+                    else:
+                        raise
+
+            if use_cpu_offload:
+                logger.info("Enabling model CPU offloading (moves components to GPU only when needed)")
+                logger.info("This reduces VRAM usage but slows inference ~2-3x")
                 self.pipe.enable_model_cpu_offload()
 
             # Apply performance optimizations
