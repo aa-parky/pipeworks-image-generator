@@ -90,7 +90,7 @@ def validate_segment_path(path: str, file: str, base_dir: Path) -> Path:
 
 
 def validate_segments(
-    segments: tuple[SegmentConfig, SegmentConfig, SegmentConfig], base_dir: Path, prompt: str
+    segments: tuple[SegmentConfig, ...], base_dir: Path, prompt: str
 ) -> None:
     """Validate all segment configurations.
 
@@ -101,15 +101,31 @@ def validate_segments(
     Also validates that any configured file segments point to valid files.
 
     Args:
-        segments: Tuple of (start, middle, end) segment configurations
+        segments: Tuple of segment configurations (can be 3 or 9 segments)
         base_dir: Base directory for resolving file paths
         prompt: Static prompt text
 
     Raises:
         ValidationError: If validation fails with user-friendly message
     """
-    start, middle, end = segments
-    segment_names = ["Start", "Middle", "End"]
+    # Generate segment names based on count
+    if len(segments) == 3:
+        segment_names = ["Start", "Middle", "End"]
+    elif len(segments) == 9:
+        segment_names = [
+            "Start 1",
+            "Start 2",
+            "Start 3",
+            "Mid 1",
+            "Mid 2",
+            "Mid 3",
+            "End 1",
+            "End 2",
+            "End 3",
+        ]
+    else:
+        # Fallback for any other count
+        segment_names = [f"Segment {i+1}" for i in range(len(segments))]
 
     # Check if any segment has dynamic flag set
     has_dynamic = any(seg.dynamic for seg in segments)
