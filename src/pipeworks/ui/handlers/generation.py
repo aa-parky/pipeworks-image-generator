@@ -261,6 +261,8 @@ def generate_image(
             # Regenerate character condition per-run if dynamic is enabled
             current_start_1 = start_1  # Use original by default
             if condition_enabled and condition_dynamic:
+                from dataclasses import replace
+
                 from pipeworks.core.character_conditions import (
                     condition_to_prompt,
                     generate_condition,
@@ -278,8 +280,8 @@ def generate_image(
                 else:
                     modified_text = new_condition_text
 
-                # Use Pydantic's model_copy to create modified config
-                current_start_1 = start_1.model_copy(update={"text": modified_text})
+                # Use dataclasses.replace to create modified config
+                current_start_1 = replace(start_1, text=modified_text)
 
             # Generate batch_size images for this run
             for i in range(batch_size):

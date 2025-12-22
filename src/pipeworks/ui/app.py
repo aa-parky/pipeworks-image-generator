@@ -511,8 +511,8 @@ def create_generation_tab(ui_state):
         state = values[84]
 
         # Concatenate condition text with Start 1 text if condition is enabled
-        # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
-        if condition_enabled_val and condition_text_val and not condition_dynamic_val:
+        # Show the condition in the prompt preview (even if dynamic - it will be regenerated during generation)
+        if condition_enabled_val and condition_text_val:
             # Condition text comes first, then user text (if any)
             original_text = start_1_values[0]  # First value is text
             if original_text and original_text.strip():
