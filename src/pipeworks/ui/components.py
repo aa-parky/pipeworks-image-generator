@@ -240,6 +240,107 @@ def create_three_segments(initial_choices: list[str]) -> tuple[SegmentUI, Segmen
     return start, middle, end
 
 
+class ConditionSegmentUI(SegmentUI):
+    """Extended segment UI with character condition generation support.
+
+    This extends the base SegmentUI with additional controls for generating
+    character conditions (physique, wealth, health, etc.) using the
+    character_conditions system.
+
+    Additional controls:
+    - Checkbox to enable auto-generation
+    - Display field for generated condition text (editable)
+    - Condition text concatenates with manual text input
+    """
+
+    def __init__(self, name: str, initial_choices: list[str]):
+        """Initialize a condition-enabled segment UI component.
+
+        Args:
+            name: Name of the segment (e.g., "Start 1")
+            initial_choices: Initial file/folder choices for dropdown
+        """
+        self.name = name
+
+        with gr.Group():
+            # Title with status indicator
+            self.title = gr.Markdown(f"**{name} Segment**")
+
+            # ================================================================
+            # CHARACTER CONDITION CONTROLS (above text input)
+            # ================================================================
+            with gr.Group():
+                gr.Markdown("**Character Condition Generator**")
+
+                self.condition_enabled = gr.Checkbox(
+                    label="Auto-generate condition",
+                    value=False,
+                    info="Generate character state (physique, wealth, etc.)",
+                )
+
+                self.condition_text = gr.Textbox(
+                    label="Generated Condition",
+                    placeholder="Enable auto-generate to create condition...",
+                    lines=1,
+                    interactive=True,
+                    info="Edit generated text or leave blank",
+                    visible=False,  # Hidden until enabled
+                )
+
+            # ================================================================
+            # STANDARD SEGMENT CONTROLS (from parent class)
+            # ================================================================
+
+            # Text input for manual text entry
+            self.text = gr.Textbox(label=f"{name} Text", placeholder="Optional text...", lines=1)
+
+            # Current path display
+            self.path_display = gr.Textbox(label="Current Path", value="/inputs", interactive=False)
+
+            # File/folder browser dropdown
+            self.file = gr.Dropdown(
+                label="File/Folder Browser", choices=initial_choices, value="(None)"
+            )
+
+            # Hidden state to track current navigation path
+            self.path_state = gr.State(value="")
+
+            # Mode and dynamic options
+            with gr.Row():
+                self.mode = gr.Dropdown(label="Mode", choices=SEGMENT_MODES, value="Random Line")
+                self.dynamic = gr.Checkbox(
+                    label="Dynamic", value=False, info="Rebuild this segment for each image"
+                )
+
+            # Mode-specific inputs (visibility controlled by mode selection)
+            with gr.Row():
+                self.line = gr.Number(
+                    label="Line #", value=1, minimum=1, precision=0, visible=False
+                )
+                self.range_end = gr.Number(
+                    label="End Line #", value=1, minimum=1, precision=0, visible=False
+                )
+                self.count = gr.Number(
+                    label="Count", value=1, minimum=1, maximum=10, precision=0, visible=False
+                )
+                self.sequential_start_line = gr.Number(
+                    label="Start Line #",
+                    value=1,
+                    minimum=1,
+                    precision=0,
+                    visible=False,
+                    info="Starting line for sequential mode",
+                )
+
+    def get_condition_components(self) -> tuple[gr.Checkbox, gr.Textbox]:
+        """Return condition generation components.
+
+        Returns:
+            Tuple of (condition_enabled checkbox, condition_text textbox)
+        """
+        return self.condition_enabled, self.condition_text
+
+
 def create_nine_segments(
     initial_choices: list[str],
 ) -> tuple[
@@ -255,13 +356,20 @@ def create_nine_segments(
 ]:
     """Create nine segment UI components arranged in 3x3 grid.
 
+    NOTE: Start 1 uses ConditionSegmentUI (extends SegmentUI) which includes
+    character condition generation controls.
+
     Args:
         initial_choices: Initial file/folder choices for dropdowns
 
     Returns:
         Tuple of 9 segments: (start_1, start_2, start_3, mid_1, mid_2, mid_3, end_1, end_2, end_3)
+        Note: start_1 is a ConditionSegmentUI, others are SegmentUI
     """
-    start_1 = SegmentUI("Start 1", initial_choices)
+    # Start 1 has condition generation support
+    start_1 = ConditionSegmentUI("Start 1", initial_choices)
+
+    # Other segments are standard
     start_2 = SegmentUI("Start 2", initial_choices)
     start_3 = SegmentUI("Start 3", initial_choices)
 

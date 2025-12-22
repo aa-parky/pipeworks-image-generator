@@ -7,7 +7,13 @@ import gradio as gr
 from pipeworks.core.config import config
 from pipeworks.plugins.base import plugin_registry
 
-from .components import SegmentUI, create_nine_segments, create_three_segments, update_mode_visibility
+from .components import (
+    ConditionSegmentUI,
+    SegmentUI,
+    create_nine_segments,
+    create_three_segments,
+    update_mode_visibility,
+)
 from .handlers import (
     analyze_prompt,
     apply_gallery_filter,
@@ -209,7 +215,8 @@ def create_generation_tab(ui_state):
                 # Row 1: Start segments
                 gr.Markdown("**Start Segments**")
                 with gr.Row():
-                    start_1 = SegmentUI("Start 1", initial_choices)
+                    # Start 1 has character condition generation support
+                    start_1 = ConditionSegmentUI("Start 1", initial_choices)
                     start_2 = SegmentUI("Start 2", initial_choices)
                     start_3 = SegmentUI("Start 3", initial_choices)
 
@@ -412,20 +419,74 @@ def create_generation_tab(ui_state):
             outputs=[line, range_end, count, sequential_start_line],
         )
 
+    # Character condition generation handler (Start 1 only)
+    def generate_condition_handler(enabled: bool, seed: int) -> tuple[str, gr.update]:
+        """Generate character condition text when checkbox is toggled.
+
+        Args:
+            enabled: Whether condition generation is enabled
+            seed: Random seed for reproducible generation
+
+        Returns:
+            Tuple of (condition_text, visibility_update)
+        """
+        if enabled:
+            # Import here to avoid circular dependency
+            from pipeworks.core.character_conditions import (
+                condition_to_prompt,
+                generate_condition,
+            )
+
+            # Generate condition using provided seed
+            condition = generate_condition(seed=seed)
+            condition_text = condition_to_prompt(condition)
+
+            # Show the condition text field
+            return condition_text, gr.update(visible=True)
+        else:
+            # Hide the condition text field and clear it
+            return "", gr.update(visible=False)
+
+    # Wire up condition generation for Start 1
+    condition_enabled, condition_text = start_1.get_condition_components()
+
+    condition_enabled.change(
+        fn=generate_condition_handler,
+        inputs=[condition_enabled, seed_input],
+        outputs=[condition_text, condition_text],
+    )
+
     # Build prompt button handler
     def build_and_update_prompt(*values):
-        """Build prompt from segment values and update UI."""
+        """Build prompt from segment values and update UI.
+
+        Now includes condition text concatenation for Start 1.
+        """
+        # Extract condition inputs (first two values)
+        condition_enabled_val = values[0]
+        condition_text_val = values[1]
+
         # Split values into segment groups (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        start_1_values = values[0:9]
-        start_2_values = values[9:18]
-        start_3_values = values[18:27]
-        mid_1_values = values[27:36]
-        mid_2_values = values[36:45]
-        mid_3_values = values[45:54]
-        end_1_values = values[54:63]
-        end_2_values = values[63:72]
-        end_3_values = values[72:81]
-        state = values[81]
+        # Values now start at index 2 because of condition inputs
+        start_1_values = list(values[2:11])
+        start_2_values = values[11:20]
+        start_3_values = values[20:29]
+        mid_1_values = values[29:38]
+        mid_2_values = values[38:47]
+        mid_3_values = values[47:56]
+        end_1_values = values[56:65]
+        end_2_values = values[65:74]
+        end_3_values = values[74:83]
+        state = values[83]
+
+        # Concatenate condition text with Start 1 text if condition is enabled
+        if condition_enabled_val and condition_text_val:
+            # Condition text comes first, then user text (if any)
+            original_text = start_1_values[0]  # First value is text
+            if original_text and original_text.strip():
+                start_1_values[0] = f"{condition_text_val}, {original_text}"
+            else:
+                start_1_values[0] = condition_text_val
 
         # Convert to SegmentConfig objects
         start_1_cfg = SegmentUI.values_to_config(*start_1_values)
@@ -502,8 +563,12 @@ def create_generation_tab(ui_state):
         )
 
     # Collect all segment inputs
+    # NOTE: Start 1 condition components must come first (used in build_and_update_prompt)
+    condition_enabled, condition_text = start_1.get_condition_components()
+
     all_segment_inputs = (
-        start_1.get_input_components()
+        [condition_enabled, condition_text]  # Condition inputs first
+        + start_1.get_input_components()
         + start_2.get_input_components()
         + start_3.get_input_components()
         + mid_1.get_input_components()
@@ -549,8 +614,11 @@ def create_generation_tab(ui_state):
 
     # Generate button handler
     def generate_wrapper(*values):
-        """Wrapper to convert segment values to SegmentConfig objects."""
-        # Extract values - now includes image editing inputs (3 images)
+        """Wrapper to convert segment values to SegmentConfig objects.
+
+        Now includes condition text concatenation for Start 1.
+        """
+        # Extract values - now includes image editing inputs (3 images) + condition inputs (2)
         input_img_1 = values[0]
         input_img_2 = values[1]
         input_img_3 = values[2]
@@ -564,17 +632,31 @@ def create_generation_tab(ui_state):
         seed = values[10]
         use_random_seed = values[11]
 
+        # Condition inputs (for Start 1)
+        condition_enabled_val = values[12]
+        condition_text_val = values[13]
+
         # Segment values (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        start_1_values = values[12:21]
-        start_2_values = values[21:30]
-        start_3_values = values[30:39]
-        mid_1_values = values[39:48]
-        mid_2_values = values[48:57]
-        mid_3_values = values[57:66]
-        end_1_values = values[66:75]
-        end_2_values = values[75:84]
-        end_3_values = values[84:93]
-        state = values[93]
+        # Indices shifted by 2 due to condition inputs
+        start_1_values = list(values[14:23])
+        start_2_values = values[23:32]
+        start_3_values = values[32:41]
+        mid_1_values = values[41:50]
+        mid_2_values = values[50:59]
+        mid_3_values = values[59:68]
+        end_1_values = values[68:77]
+        end_2_values = values[77:86]
+        end_3_values = values[86:95]
+        state = values[95]
+
+        # Concatenate condition text with Start 1 text if condition is enabled
+        if condition_enabled_val and condition_text_val:
+            # Condition text comes first, then user text (if any)
+            original_text = start_1_values[0]  # First value is text
+            if original_text and original_text.strip():
+                start_1_values[0] = f"{condition_text_val}, {original_text}"
+            else:
+                start_1_values[0] = condition_text_val
 
         # Convert to SegmentConfig objects
         start_1_cfg = SegmentUI.values_to_config(*start_1_values)
