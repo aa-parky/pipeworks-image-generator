@@ -151,6 +151,9 @@ def generate_image(
     state: UIState,
     input_images: list[str] | None = None,
     instruction: str | None = None,
+    condition_enabled: bool = False,
+    condition_text: str = "",
+    condition_dynamic: bool = False,
 ) -> tuple[list[str], str, str, UIState]:
     """Generate or edit image(s) from the UI inputs.
 
@@ -175,6 +178,9 @@ def generate_image(
         state: UI state
         input_images: Input image paths for image editing (1-3 images, optional)
         instruction: Editing instruction for image editing (optional)
+        condition_enabled: Whether character condition generation is enabled
+        condition_text: Current condition text (used if not dynamic)
+        condition_dynamic: Whether to regenerate condition per-run
 
     Returns:
         Tuple of (image_paths, info_text, seed_used, updated_state)
@@ -252,14 +258,38 @@ def generate_image(
         for run in range(runs):
             logger.info(f"Starting run {run+1}/{runs}")
 
+            # Regenerate character condition per-run if dynamic is enabled
+            current_start_1 = start_1  # Use original by default
+            if condition_enabled and condition_dynamic:
+                from pipeworks.core.character_conditions import (
+                    condition_to_prompt,
+                    generate_condition,
+                )
+
+                # Generate new condition for this run (using random seed)
+                condition = generate_condition(seed=None)
+                new_condition_text = condition_to_prompt(condition)
+                logger.info(f"Generated dynamic condition for run {run+1}: {new_condition_text}")
+
+                # Create modified Start 1 config with condition prepended
+                original_text = start_1.text
+                if original_text and original_text.strip():
+                    modified_text = f"{new_condition_text}, {original_text}"
+                else:
+                    modified_text = new_condition_text
+
+                # Use Pydantic's model_copy to create modified config
+                current_start_1 = start_1.model_copy(update={"text": modified_text})
+
             # Generate batch_size images for this run
             for i in range(batch_size):
-                # Build prompt dynamically if any segment is dynamic
-                if has_dynamic:
+                # Build prompt dynamically if any segment is dynamic (or condition is dynamic)
+                if has_dynamic or condition_dynamic:
                     try:
                         # Pass run index for Sequential mode support
+                        # Use current_start_1 (which may have dynamic condition prepended)
                         current_prompt = build_combined_prompt(
-                            start_1,
+                            current_start_1,
                             start_2,
                             start_3,
                             mid_1,
@@ -351,8 +381,14 @@ def generate_image(
 
         # Dynamic prompts info
         dynamic_info = ""
-        if has_dynamic:
-            dynamic_info = "\n**Dynamic Prompts:** Enabled (prompts rebuilt for each image)"
+        if has_dynamic or condition_dynamic:
+            if has_dynamic and condition_dynamic:
+                dynamic_info = "\n**Dynamic Prompts:** Enabled (prompts + conditions rebuilt per run)"
+            elif has_dynamic:
+                dynamic_info = "\n**Dynamic Prompts:** Enabled (prompts rebuilt for each image)"
+            elif condition_dynamic:
+                dynamic_info = "\n**Dynamic Conditions:** Enabled (conditions rebuilt per run)"
+
             if len(prompts_used) <= 3:
                 # Show all prompts if 3 or fewer
                 dynamic_info += f"\n**Sample Prompts:** {', '.join(prompts_used[:3])}"

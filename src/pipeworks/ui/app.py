@@ -468,6 +468,7 @@ def create_generation_tab(ui_state):
         condition_enabled,
         condition_text,
         condition_regenerate,
+        condition_dynamic,
         condition_controls,
     ) = start_1.get_condition_components()
 
@@ -491,25 +492,27 @@ def create_generation_tab(ui_state):
 
         Now includes condition text concatenation for Start 1.
         """
-        # Extract condition inputs (first two values)
+        # Extract condition inputs (first three values)
         condition_enabled_val = values[0]
         condition_text_val = values[1]
+        condition_dynamic_val = values[2]
 
         # Split values into segment groups (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        # Values now start at index 2 because of condition inputs
-        start_1_values = list(values[2:11])
-        start_2_values = values[11:20]
-        start_3_values = values[20:29]
-        mid_1_values = values[29:38]
-        mid_2_values = values[38:47]
-        mid_3_values = values[47:56]
-        end_1_values = values[56:65]
-        end_2_values = values[65:74]
-        end_3_values = values[74:83]
-        state = values[83]
+        # Values now start at index 3 because of condition inputs
+        start_1_values = list(values[3:12])
+        start_2_values = values[12:21]
+        start_3_values = values[21:30]
+        mid_1_values = values[30:39]
+        mid_2_values = values[39:48]
+        mid_3_values = values[48:57]
+        end_1_values = values[57:66]
+        end_2_values = values[66:75]
+        end_3_values = values[75:84]
+        state = values[84]
 
         # Concatenate condition text with Start 1 text if condition is enabled
-        if condition_enabled_val and condition_text_val:
+        # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
+        if condition_enabled_val and condition_text_val and not condition_dynamic_val:
             # Condition text comes first, then user text (if any)
             original_text = start_1_values[0]  # First value is text
             if original_text and original_text.strip():
@@ -595,7 +598,7 @@ def create_generation_tab(ui_state):
     # NOTE: Start 1 condition components must come first (used in build_and_update_prompt)
     # (condition components already extracted above for handlers)
     all_segment_inputs = (
-        [condition_enabled, condition_text]  # Only these 2 are used in handlers
+        [condition_enabled, condition_text, condition_dynamic]  # Condition inputs for Start 1
         + start_1.get_input_components()
         + start_2.get_input_components()
         + start_3.get_input_components()
@@ -663,22 +666,24 @@ def create_generation_tab(ui_state):
         # Condition inputs (for Start 1)
         condition_enabled_val = values[12]
         condition_text_val = values[13]
+        condition_dynamic_val = values[14]
 
         # Segment values (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        # Indices shifted by 2 due to condition inputs
-        start_1_values = list(values[14:23])
-        start_2_values = values[23:32]
-        start_3_values = values[32:41]
-        mid_1_values = values[41:50]
-        mid_2_values = values[50:59]
-        mid_3_values = values[59:68]
-        end_1_values = values[68:77]
-        end_2_values = values[77:86]
-        end_3_values = values[86:95]
-        state = values[95]
+        # Indices shifted by 3 due to condition inputs
+        start_1_values = list(values[15:24])
+        start_2_values = values[24:33]
+        start_3_values = values[33:42]
+        mid_1_values = values[42:51]
+        mid_2_values = values[51:60]
+        mid_3_values = values[60:69]
+        end_1_values = values[69:78]
+        end_2_values = values[78:87]
+        end_3_values = values[87:96]
+        state = values[96]
 
         # Concatenate condition text with Start 1 text if condition is enabled
-        if condition_enabled_val and condition_text_val:
+        # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
+        if condition_enabled_val and condition_text_val and not condition_dynamic_val:
             # Condition text comes first, then user text (if any)
             original_text = start_1_values[0]  # First value is text
             if original_text and original_text.strip():
@@ -722,6 +727,9 @@ def create_generation_tab(ui_state):
             state,
             input_images=input_images if input_images else None,
             instruction=instruction,
+            condition_enabled=condition_enabled_val,
+            condition_text=condition_text_val,
+            condition_dynamic=condition_dynamic_val,
         )
 
     # Collect all inputs for generation (includes image editing inputs)

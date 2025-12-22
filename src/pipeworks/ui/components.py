@@ -285,7 +285,7 @@ class ConditionSegmentUI(SegmentUI):
                         lines=1,
                         interactive=True,
                         info="Edit generated text or leave blank",
-                        scale=3,
+                        scale=2,
                     )
 
                     self.condition_regenerate = gr.Button(
@@ -293,6 +293,13 @@ class ConditionSegmentUI(SegmentUI):
                         size="sm",
                         scale=1,
                         variant="secondary",
+                    )
+
+                    self.condition_dynamic = gr.Checkbox(
+                        label="Dynamic",
+                        value=False,
+                        info="New condition per run",
+                        scale=1,
                     )
 
             # ================================================================
@@ -340,17 +347,20 @@ class ConditionSegmentUI(SegmentUI):
                     info="Starting line for sequential mode",
                 )
 
-    def get_condition_components(self) -> tuple[gr.Checkbox, gr.Textbox, gr.Button, gr.Row]:
+    def get_condition_components(
+        self,
+    ) -> tuple[gr.Checkbox, gr.Textbox, gr.Button, gr.Checkbox, gr.Row]:
         """Return condition generation components.
 
         Returns:
             Tuple of (condition_enabled checkbox, condition_text textbox,
-                     regenerate button, condition_controls row)
+                     regenerate button, condition_dynamic checkbox, condition_controls row)
         """
         return (
             self.condition_enabled,
             self.condition_text,
             self.condition_regenerate,
+            self.condition_dynamic,
             self.condition_controls,
         )
 
