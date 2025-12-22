@@ -419,16 +419,17 @@ def create_generation_tab(ui_state):
             outputs=[line, range_end, count, sequential_start_line],
         )
 
-    # Character condition generation handler (Start 1 only)
-    def generate_condition_handler(enabled: bool, seed: int) -> tuple[str, gr.update]:
-        """Generate character condition text when checkbox is toggled.
+    # Character condition generation handlers (Start 1 only)
+    def toggle_condition_handler(enabled: bool) -> tuple[str, gr.update]:
+        """Show/hide condition controls and generate initial condition.
+
+        Uses random seed by default for variety.
 
         Args:
             enabled: Whether condition generation is enabled
-            seed: Random seed for reproducible generation
 
         Returns:
-            Tuple of (condition_text, visibility_update)
+            Tuple of (condition_text, controls_visibility_update)
         """
         if enabled:
             # Import here to avoid circular dependency
@@ -437,23 +438,51 @@ def create_generation_tab(ui_state):
                 generate_condition,
             )
 
-            # Generate condition using provided seed
-            condition = generate_condition(seed=seed)
+            # Generate condition using random seed (None = system entropy)
+            condition = generate_condition(seed=None)
             condition_text = condition_to_prompt(condition)
 
-            # Show the condition text field
+            # Show the condition controls
             return condition_text, gr.update(visible=True)
         else:
-            # Hide the condition text field and clear it
+            # Hide the condition controls and clear text
             return "", gr.update(visible=False)
 
-    # Wire up condition generation for Start 1
-    condition_enabled, condition_text = start_1.get_condition_components()
+    def regenerate_condition_handler() -> str:
+        """Generate a new random condition when regenerate button is clicked.
 
+        Returns:
+            New condition text
+        """
+        from pipeworks.core.character_conditions import (
+            condition_to_prompt,
+            generate_condition,
+        )
+
+        # Always use random seed for variety
+        condition = generate_condition(seed=None)
+        return condition_to_prompt(condition)
+
+    # Wire up condition generation for Start 1
+    (
+        condition_enabled,
+        condition_text,
+        condition_regenerate,
+        condition_controls,
+    ) = start_1.get_condition_components()
+
+    # Toggle handler: show/hide controls and generate initial condition
     condition_enabled.change(
-        fn=generate_condition_handler,
-        inputs=[condition_enabled, seed_input],
-        outputs=[condition_text, condition_text],
+        fn=toggle_condition_handler,
+        inputs=[condition_enabled],
+        outputs=[condition_text, condition_controls],
+    )
+
+    # Regenerate button: create new random condition
+    condition_regenerate.click(
+        fn=regenerate_condition_handler,
+        inputs=[],
+        outputs=[condition_text],
     )
 
     # Build prompt button handler
@@ -564,10 +593,9 @@ def create_generation_tab(ui_state):
 
     # Collect all segment inputs
     # NOTE: Start 1 condition components must come first (used in build_and_update_prompt)
-    condition_enabled, condition_text = start_1.get_condition_components()
-
+    # (condition components already extracted above for handlers)
     all_segment_inputs = (
-        [condition_enabled, condition_text]  # Condition inputs first
+        [condition_enabled, condition_text]  # Only these 2 are used in handlers
         + start_1.get_input_components()
         + start_2.get_input_components()
         + start_3.get_input_components()

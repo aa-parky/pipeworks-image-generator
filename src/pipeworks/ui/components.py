@@ -278,14 +278,22 @@ class ConditionSegmentUI(SegmentUI):
                     info="Generate character state (physique, wealth, etc.)",
                 )
 
-                self.condition_text = gr.Textbox(
-                    label="Generated Condition",
-                    placeholder="Enable auto-generate to create condition...",
-                    lines=1,
-                    interactive=True,
-                    info="Edit generated text or leave blank",
-                    visible=False,  # Hidden until enabled
-                )
+                with gr.Row(visible=False) as self.condition_controls:
+                    self.condition_text = gr.Textbox(
+                        label="Generated Condition",
+                        placeholder="Click generate to create condition...",
+                        lines=1,
+                        interactive=True,
+                        info="Edit generated text or leave blank",
+                        scale=3,
+                    )
+
+                    self.condition_regenerate = gr.Button(
+                        "🎲 Regenerate",
+                        size="sm",
+                        scale=1,
+                        variant="secondary",
+                    )
 
             # ================================================================
             # STANDARD SEGMENT CONTROLS (from parent class)
@@ -332,13 +340,19 @@ class ConditionSegmentUI(SegmentUI):
                     info="Starting line for sequential mode",
                 )
 
-    def get_condition_components(self) -> tuple[gr.Checkbox, gr.Textbox]:
+    def get_condition_components(self) -> tuple[gr.Checkbox, gr.Textbox, gr.Button, gr.Row]:
         """Return condition generation components.
 
         Returns:
-            Tuple of (condition_enabled checkbox, condition_text textbox)
+            Tuple of (condition_enabled checkbox, condition_text textbox,
+                     regenerate button, condition_controls row)
         """
-        return self.condition_enabled, self.condition_text
+        return (
+            self.condition_enabled,
+            self.condition_text,
+            self.condition_regenerate,
+            self.condition_controls,
+        )
 
 
 def create_nine_segments(
