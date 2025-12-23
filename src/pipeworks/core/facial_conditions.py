@@ -1,0 +1,350 @@
+"""Facial condition generation system for character rendering.
+
+This module implements a structured system for generating facial signal descriptors
+that modulate how a character's face is perceived by the renderer. Unlike anatomical
+specifications, these signals bias interpretation rather than define explicit features.
+
+IMPORTANT: This module is designed as a standalone experiment to test how facial
+signals interact with character conditions (from character_conditions.py). It is
+LIKELY TO BE MERGED into character_conditions.py once the interaction patterns are
+validated and appropriate cross-system exclusion rules are identified.
+
+Design Philosophy:
+    Facial signals are perceptual modifiers, not anatomical specifications:
+    - "sharp-featured" → biases toward angular interpretation
+    - "soft-featured" → biases toward rounded interpretation
+    - "weathered" → applies wear/age texture signal
+    - "understated" → reduces feature prominence
+    - "pronounced" → increases feature prominence
+    - "exaggerated" → pushes features toward extremes
+    - "asymmetrical" → introduces irregularity signal
+
+Example usage:
+    >>> from pipeworks.core.facial_conditions import generate_facial_condition
+    >>> facial = generate_facial_condition(seed=42)
+    >>> print(facial)
+    {'facial_signal': 'weathered'}
+
+    >>> from pipeworks.core.facial_conditions import facial_condition_to_prompt
+    >>> prompt_fragment = facial_condition_to_prompt(facial)
+    >>> print(prompt_fragment)
+    'weathered'
+
+Architecture:
+    1. FACIAL_AXES: Define all possible facial signal values
+    2. FACIAL_POLICY: Rules for axis selection (all optional by design)
+    3. FACIAL_WEIGHTS: Statistical distribution for realistic variety
+    4. FACIAL_EXCLUSIONS: Semantic constraints within facial system
+    5. Generator: Produces constrained random combinations
+    6. Converter: Transforms structured data into prompt text
+
+Future Integration:
+    When merged into character_conditions.py, cross-system exclusions will be needed:
+    - age="young" + facial_signal="weathered" (likely conflict)
+    - health="sickly" + facial_signal="soft-featured" (possible redundancy)
+    - age="ancient" + facial_signal="understated" (may be incoherent)
+
+    The separate module allows empirical testing of these interactions before
+    encoding them into the combined exclusion rules.
+"""
+
+import logging
+import random
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# AXIS DEFINITIONS - Single Source of Truth for Facial Signals
+# ============================================================================
+
+FACIAL_AXES: dict[str, list[str]] = {
+    # Facial feature perception modifiers
+    # NOTE: These are mutually exclusive signals - a face is generally either
+    # "sharp-featured" OR "soft-featured", not both. The max_optional=1 policy
+    # enforces this at the generation level.
+    "facial_signal": [
+        "understated",  # Reduces feature prominence
+        "pronounced",  # Increases feature prominence
+        "exaggerated",  # Pushes features toward extremes
+        "asymmetrical",  # Introduces irregularity
+        "weathered",  # Applies wear/age texture
+        "soft-featured",  # Biases toward rounded interpretation
+        "sharp-featured",  # Biases toward angular interpretation
+    ],
+}
+
+# ============================================================================
+# AXIS POLICY - Controls Facial Signal Selection
+# ============================================================================
+
+FACIAL_POLICY: dict[str, Any] = {
+    # No mandatory facial signals - these are always optional detail additions
+    "mandatory": [],
+    # Facial signals are optional and should be used sparingly
+    "optional": ["facial_signal"],
+    # Maximum of 1 facial signal to prevent conflicting perceptual biases
+    # (e.g., can't be both "soft-featured" AND "sharp-featured")
+    "max_optional": 1,
+}
+
+# ============================================================================
+# WEIGHTS - Statistical Distribution for Facial Signals
+# ============================================================================
+
+FACIAL_WEIGHTS: dict[str, dict[str, float]] = {
+    # Facial signal distribution: skewed toward subtle/neutral signals
+    "facial_signal": {
+        "understated": 3.0,  # Common - most faces aren't remarkable
+        "soft-featured": 2.5,  # Fairly common
+        "pronounced": 2.0,  # Moderate
+        "sharp-featured": 2.0,  # Moderate
+        "weathered": 1.5,  # Less common (requires age/experience)
+        "asymmetrical": 1.0,  # Uncommon
+        "exaggerated": 0.5,  # Rare - extreme features
+    },
+}
+
+# ============================================================================
+# EXCLUSIONS - Semantic Coherence Rules (Within Facial System)
+# ============================================================================
+
+# NOTE: Most exclusions will be cross-system (facial + character conditions)
+# and will be implemented when this module is merged into character_conditions.py.
+# For now, we define only the most obvious internal conflicts.
+
+FACIAL_EXCLUSIONS: dict[tuple[str, str], dict[str, list[str]]] = {
+    # Internal facial system exclusions (conceptual opposites)
+    # These are technically prevented by max_optional=1, but explicitly
+    # documented here for clarity and future-proofing.
+    # Note: With max_optional=1, these exclusions are redundant but serve as
+    # documentation of the design intent. If max_optional is increased in the
+    # future, these rules become critical.
+}
+
+# ============================================================================
+# GENERATOR FUNCTIONS
+# ============================================================================
+
+
+def weighted_choice(options: list[str], weights: dict[str, float] | None = None) -> str:
+    """Select a random option with optional weighted probabilities.
+
+    This is a duplicate of the weighted_choice function in character_conditions.py
+    to maintain module independence during the experimental phase. When merged,
+    this function will be deduplicated.
+
+    Args:
+        options: List of possible values to choose from
+        weights: Optional dictionary mapping options to weights.
+                If None or missing entries, defaults to uniform distribution.
+
+    Returns:
+        Randomly selected option (str)
+
+    Examples:
+        >>> # Uniform distribution
+        >>> weighted_choice(["a", "b", "c"])
+        'b'
+
+        >>> # Weighted distribution (more likely to pick "common")
+        >>> weighted_choice(["rare", "common"], {"rare": 1, "common": 5})
+        'common'
+    """
+    if not weights:
+        return random.choice(options)
+
+    # Build weight list matching option order
+    # Use weight of 1.0 for any option not in the weights dict
+    weight_values = [weights.get(option, 1.0) for option in options]
+
+    # random.choices returns a list of k elements, we want just one
+    return random.choices(options, weights=weight_values, k=1)[0]
+
+
+def generate_facial_condition(seed: int | None = None) -> dict[str, str]:
+    """Generate a facial signal condition using weighted random selection.
+
+    This function applies the facial signal rule system:
+    1. No mandatory axes (all facial signals are optional)
+    2. Select 0-1 optional axes (controlled by policy)
+    3. Apply weighted probability distributions
+    4. Apply semantic exclusion rules (currently minimal)
+    5. Return structured condition data
+
+    NOTE: Returns empty dict if no facial signal is selected (50% chance with
+    max_optional=1). This is intentional - not all characters need facial signals.
+
+    Args:
+        seed: Optional random seed for reproducible generation.
+             If None, uses system entropy (non-reproducible).
+
+    Returns:
+        Dictionary mapping axis names to selected values.
+        Example: {"facial_signal": "weathered"}
+        Or: {} (no facial signal selected)
+
+    Examples:
+        >>> # Reproducible generation
+        >>> cond1 = generate_facial_condition(seed=42)
+        >>> cond2 = generate_facial_condition(seed=42)
+        >>> cond1 == cond2
+        True
+
+        >>> # Non-reproducible (different each call)
+        >>> generate_facial_condition()
+        {'facial_signal': 'soft-featured'}
+
+        >>> # May return empty dict (no facial signal)
+        >>> generate_facial_condition()
+        {}
+    """
+    # Set random seed for reproducibility if provided
+    if seed is not None:
+        random.seed(seed)
+
+    chosen: dict[str, str] = {}
+
+    # ========================================================================
+    # PHASE 1: Select mandatory axes
+    # Currently empty for facial signals (all are optional)
+    # ========================================================================
+    for axis in FACIAL_POLICY["mandatory"]:
+        if axis not in FACIAL_AXES:
+            logger.warning(f"Mandatory axis '{axis}' not defined in FACIAL_AXES")
+            continue
+
+        chosen[axis] = weighted_choice(FACIAL_AXES[axis], FACIAL_WEIGHTS.get(axis))
+        logger.debug(f"Mandatory axis selected: {axis} = {chosen[axis]}")
+
+    # ========================================================================
+    # PHASE 2: Select optional axes
+    # Randomly pick 0 to max_optional axes (currently 0 or 1)
+    # ========================================================================
+    max_optional = FACIAL_POLICY.get("max_optional", 1)
+    num_optional = random.randint(0, min(max_optional, len(FACIAL_POLICY["optional"])))
+
+    # Randomly sample without replacement
+    optional_axes = random.sample(FACIAL_POLICY["optional"], num_optional)
+    logger.debug(f"Selected {num_optional} optional axes: {optional_axes}")
+
+    for axis in optional_axes:
+        if axis not in FACIAL_AXES:
+            logger.warning(f"Optional axis '{axis}' not defined in FACIAL_AXES")
+            continue
+
+        chosen[axis] = weighted_choice(FACIAL_AXES[axis], FACIAL_WEIGHTS.get(axis))
+        logger.debug(f"Optional axis selected: {axis} = {chosen[axis]}")
+
+    # ========================================================================
+    # PHASE 3: Apply semantic exclusion rules
+    # Currently minimal - most exclusions will be cross-system
+    # ========================================================================
+    exclusions_applied = 0
+
+    for (axis, value), blocked in FACIAL_EXCLUSIONS.items():
+        # Check if this exclusion rule is triggered
+        if chosen.get(axis) == value:
+            logger.debug(f"Exclusion rule triggered: {axis}={value}")
+
+            # Check each blocked axis
+            for blocked_axis, blocked_values in blocked.items():
+                if chosen.get(blocked_axis) in blocked_values:
+                    removed_value = chosen.pop(blocked_axis)
+                    exclusions_applied += 1
+                    logger.debug(
+                        f"  Removed {blocked_axis}={removed_value} "
+                        f"(conflicts with {axis}={value})"
+                    )
+
+    if exclusions_applied > 0:
+        logger.info(f"Applied {exclusions_applied} exclusion rule(s)")
+
+    return chosen
+
+
+def facial_condition_to_prompt(condition_dict: dict[str, str]) -> str:
+    """Convert structured facial condition data to a prompt fragment.
+
+    This is the only place structured data becomes prose text.
+    The output is designed to be clean and diffusion-friendly.
+
+    NOTE: When merged into character_conditions.py, this function will be
+    replaced by the existing condition_to_prompt() function.
+
+    Args:
+        condition_dict: Dictionary mapping axis names to values
+                       (output from generate_facial_condition)
+
+    Returns:
+        Comma-separated string of condition values
+        (Currently only one value since max_optional=1)
+
+    Examples:
+        >>> facial_condition_to_prompt({"facial_signal": "weathered"})
+        'weathered'
+
+        >>> facial_condition_to_prompt({})
+        ''
+
+    Notes:
+        - Order is determined by dict iteration (Python 3.7+ preserves insertion order)
+        - Empty dict returns empty string
+        - With max_optional=1, output is always a single word or empty string
+    """
+    if not condition_dict:
+        return ""
+
+    # Join values with comma separator (diffusion-friendly format)
+    # With current policy (max_optional=1), this will be a single value
+    return ", ".join(condition_dict.values())
+
+
+def get_available_facial_axes() -> list[str]:
+    """Get list of all defined facial condition axes.
+
+    Returns:
+        List of axis names (currently just ['facial_signal'])
+
+    Example:
+        >>> get_available_facial_axes()
+        ['facial_signal']
+    """
+    return list(FACIAL_AXES.keys())
+
+
+def get_facial_axis_values(axis: str) -> list[str]:
+    """Get all possible values for a specific facial axis.
+
+    Args:
+        axis: Name of the axis (e.g., 'facial_signal')
+
+    Returns:
+        List of possible values for that axis
+
+    Raises:
+        KeyError: If axis is not defined in FACIAL_AXES
+
+    Example:
+        >>> get_facial_axis_values('facial_signal')
+        ['understated', 'pronounced', 'exaggerated', 'asymmetrical',
+         'weathered', 'soft-featured', 'sharp-featured']
+    """
+    return FACIAL_AXES[axis]
+
+
+# ============================================================================
+# MODULE METADATA
+# ============================================================================
+
+__all__ = [
+    "FACIAL_AXES",
+    "FACIAL_POLICY",
+    "FACIAL_WEIGHTS",
+    "FACIAL_EXCLUSIONS",
+    "weighted_choice",
+    "generate_facial_condition",
+    "facial_condition_to_prompt",
+    "get_available_facial_axes",
+    "get_facial_axis_values",
+]
