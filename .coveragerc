@@ -1,6 +1,8 @@
 # Coverage configuration for pytest-cov
 [run]
-source = src/pipeworks/ui
+source =
+    src/pipeworks/core
+    src/pipeworks/ui
 omit =
     */tests/*
     */test_*
