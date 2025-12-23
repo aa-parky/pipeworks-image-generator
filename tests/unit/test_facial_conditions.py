@@ -8,12 +8,12 @@ facial_conditions module is designed for eventual merger into character_conditio
 
 Test coverage includes:
 - Weighted random selection
-- Condition generation with optional-only axes
+- Condition generation with mandatory facial_signal axis
 - Semantic exclusion rules (currently minimal)
 - Reproducibility via seeding
 - Prompt text formatting
 - Helper functions
-- Empty result handling (no facial signal selected)
+- Consistent non-empty result generation
 """
 
 import random
@@ -83,9 +83,10 @@ class TestDataStructures:
         assert FACIAL_POLICY["max_optional"] >= 0
         assert FACIAL_POLICY["max_optional"] <= len(FACIAL_POLICY["optional"])
 
-    def test_facial_policy_no_mandatory_axes(self):
-        """Test that facial signals have no mandatory axes (all optional)."""
-        assert len(FACIAL_POLICY["mandatory"]) == 0, "Facial signals should all be optional"
+    def test_facial_policy_has_mandatory_facial_signal(self):
+        """Test that facial_signal is mandatory (always generated)."""
+        assert len(FACIAL_POLICY["mandatory"]) == 1, "Should have exactly one mandatory axis"
+        assert "facial_signal" in FACIAL_POLICY["mandatory"], "facial_signal must be mandatory"
 
     def test_facial_policy_references_valid_axes(self):
         """Test that FACIAL_POLICY only references defined axes."""
@@ -212,26 +213,29 @@ class TestGenerateFacialCondition:
         result = generate_facial_condition(seed=42)
         assert isinstance(result, dict)
 
-    def test_generate_facial_condition_can_be_empty(self):
-        """Test that facial condition can be empty (no signal selected)."""
+    def test_generate_facial_condition_never_empty(self):
+        """Test that facial condition is never empty (facial_signal is mandatory)."""
         # Run multiple times to test different random outcomes
         results = [generate_facial_condition(seed=seed) for seed in range(50)]
 
-        # At least some should be empty (50% chance with max_optional=1)
-        empty_count = sum(1 for r in results if len(r) == 0)
-        assert empty_count > 0, "Should have at least some empty results"
-
-        # At least some should be non-empty
-        non_empty_count = sum(1 for r in results if len(r) > 0)
-        assert non_empty_count > 0, "Should have at least some non-empty results"
+        # All results should be non-empty since facial_signal is mandatory
+        for i, result in enumerate(results):
+            assert len(result) > 0, f"Result was empty for seed {i}"
+            assert "facial_signal" in result, f"Missing facial_signal for seed {i}"
+            assert result["facial_signal"] in FACIAL_AXES["facial_signal"]
 
     def test_generate_facial_condition_includes_mandatory_axes(self):
-        """Test that all mandatory axes are included (currently none)."""
+        """Test that all mandatory axes are included (facial_signal)."""
         result = generate_facial_condition(seed=42)
 
+        # facial_signal should always be present
         for axis in FACIAL_POLICY["mandatory"]:
             assert axis in result, f"Mandatory axis '{axis}' not in result"
             assert result[axis] in FACIAL_AXES[axis]
+
+        # Specifically check facial_signal
+        assert "facial_signal" in result
+        assert result["facial_signal"] in FACIAL_AXES["facial_signal"]
 
     def test_generate_facial_condition_respects_max_optional(self):
         """Test that number of optional axes respects max_optional limit."""
@@ -246,13 +250,17 @@ class TestGenerateFacialCondition:
                 optional_count <= max_optional
             ), f"Too many optional axes: {optional_count} > {max_optional}"
 
-    def test_generate_facial_condition_max_one_signal(self):
-        """Test that at most one facial signal is selected."""
+            # Since optional is empty, count should always be 0
+            assert optional_count == 0, "Optional list is empty, should have 0 optional axes"
+
+    def test_generate_facial_condition_exactly_one_signal(self):
+        """Test that exactly one facial signal is always generated."""
         for seed in range(100):
             result = generate_facial_condition(seed=seed)
 
-            # Should have 0 or 1 facial_signal
-            assert len(result) <= 1, f"Expected at most 1 facial signal, got {len(result)}"
+            # Should always have exactly 1 facial_signal (mandatory)
+            assert len(result) == 1, f"Expected exactly 1 facial signal, got {len(result)}"
+            assert "facial_signal" in result
 
     def test_generate_facial_condition_all_values_valid(self):
         """Test that all selected values are valid for their axes."""
@@ -307,7 +315,9 @@ class TestGenerateFacialCondition:
         """Test that generate_facial_condition works with seed=None (non-reproducible)."""
         result = generate_facial_condition(seed=None)
         assert isinstance(result, dict)
-        # Result can be empty (no facial signal selected)
+        # Result should always have a facial_signal (mandatory)
+        assert len(result) > 0
+        assert "facial_signal" in result
 
     def test_generate_facial_condition_weighted_distribution(self):
         """Test that weights affect probability distribution (statistical test)."""
@@ -463,22 +473,22 @@ class TestIntegration:
         for value in condition.values():
             assert value in prompt
 
-    def test_full_generation_workflow_without_signal(self):
-        """Test complete workflow when no facial signal is selected."""
-        # Find a seed that produces an empty condition
-        condition = None
-        for seed in range(100):
+    def test_full_generation_workflow_always_produces_signal(self):
+        """Test complete workflow always produces a facial signal."""
+        # Test multiple seeds
+        for seed in range(20):
             condition = generate_facial_condition(seed=seed)
-            if not condition:
-                break
 
-        assert condition is not None, "Should find at least one empty condition"
-        assert len(condition) == 0
+            # Should always have a condition (facial_signal is mandatory)
+            assert condition is not None
+            assert len(condition) > 0
+            assert "facial_signal" in condition
 
-        # Step 2: Convert to prompt
-        prompt = facial_condition_to_prompt(condition)
-        assert isinstance(prompt, str)
-        assert len(prompt) == 0
+            # Step 2: Convert to prompt
+            prompt = facial_condition_to_prompt(condition)
+            assert isinstance(prompt, str)
+            assert len(prompt) > 0
+            assert prompt == condition["facial_signal"]
 
     def test_reproducible_workflow(self):
         """Test that entire workflow is reproducible with seed."""
@@ -502,12 +512,13 @@ class TestIntegration:
             prompt = facial_condition_to_prompt(condition)
             prompts.append(prompt)
 
-        # Should have good diversity (multiple different signals + empty)
+        # Should have good diversity (multiple different signals)
         unique_prompts = set(prompts)
         assert len(unique_prompts) >= 5, f"Low diversity: only {len(unique_prompts)} unique prompts"
 
-        # Should include empty string (no signal)
-        assert "" in unique_prompts, "Should have at least one empty result"
+        # All prompts should be non-empty (facial_signal is mandatory)
+        assert all(prompt for prompt in prompts), "All prompts should be non-empty"
+        assert "" not in unique_prompts, "Should have no empty results"
 
 
 # ============================================================================
@@ -535,22 +546,24 @@ class TestEdgeCases:
 
     def test_facial_condition_to_prompt_preserves_order(self):
         """Test that facial_condition_to_prompt preserves dict insertion order."""
-        # With max_optional=1, we only ever have one key, but test the principle
+        # With facial_signal as mandatory, we always have exactly one key
         condition = {}
         condition["facial_signal"] = "weathered"
 
         result = facial_condition_to_prompt(condition)
         assert result == "weathered"
 
-    def test_multiple_empty_generations(self):
-        """Test that multiple empty generations are handled correctly."""
-        # Generate multiple empty conditions
+    def test_all_generations_produce_signals(self):
+        """Test that all generations produce non-empty facial signals."""
+        # Generate multiple conditions - all should have signals
         for seed in range(100):
             condition = generate_facial_condition(seed=seed)
-            if not condition:
-                # Empty condition should produce empty prompt
-                prompt = facial_condition_to_prompt(condition)
-                assert prompt == ""
+            # All conditions should be non-empty
+            assert condition, f"Condition was empty for seed {seed}"
+            assert "facial_signal" in condition
+            # Prompt should also be non-empty
+            prompt = facial_condition_to_prompt(condition)
+            assert prompt, f"Prompt was empty for seed {seed}"
 
 
 # ============================================================================
@@ -561,16 +574,15 @@ class TestEdgeCases:
 class TestStatisticalProperties:
     """Test statistical properties of generation over many samples."""
 
-    def test_empty_result_probability(self):
-        """Test that empty results occur with reasonable probability."""
-        # With max_optional=1 and random.randint(0, 1), expect ~50% empty
+    def test_no_empty_results_ever(self):
+        """Test that no empty results occur (facial_signal is mandatory)."""
+        # With facial_signal as mandatory, expect 0% empty results
         results = [generate_facial_condition(seed=seed) for seed in range(200)]
 
         empty_count = sum(1 for r in results if len(r) == 0)
-        empty_ratio = empty_count / len(results)
 
-        # Should be roughly 50% empty (allow 40-60% range for statistical variance)
-        assert 0.35 <= empty_ratio <= 0.65, f"Empty ratio {empty_ratio:.2f} outside expected range"
+        # Should never be empty - facial_signal is always generated
+        assert empty_count == 0, f"Found {empty_count} empty results - expected 0 (facial_signal is mandatory)"
 
     def test_all_signals_can_appear(self):
         """Test that all facial signals can appear over many generations."""

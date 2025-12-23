@@ -32,7 +32,7 @@ Example usage:
 
 Architecture:
     1. FACIAL_AXES: Define all possible facial signal values
-    2. FACIAL_POLICY: Rules for axis selection (all optional by design)
+    2. FACIAL_POLICY: Rules for axis selection (facial_signal is mandatory)
     3. FACIAL_WEIGHTS: Statistical distribution for realistic variety
     4. FACIAL_EXCLUSIONS: Semantic constraints within facial system
     5. Generator: Produces constrained random combinations
@@ -79,13 +79,14 @@ FACIAL_AXES: dict[str, list[str]] = {
 # ============================================================================
 
 FACIAL_POLICY: dict[str, Any] = {
-    # No mandatory facial signals - these are always optional detail additions
-    "mandatory": [],
-    # Facial signals are optional and should be used sparingly
-    "optional": ["facial_signal"],
-    # Maximum of 1 facial signal to prevent conflicting perceptual biases
-    # (e.g., can't be both "soft-featured" AND "sharp-featured")
-    "max_optional": 1,
+    # Facial signal is mandatory - when this module is called, always generate a signal
+    # This ensures consistent behavior: if user explicitly requests facial conditions,
+    # they always get one (not a 50% chance of empty result)
+    "mandatory": ["facial_signal"],
+    # No optional axes - we always generate exactly one facial signal
+    "optional": [],
+    # max_optional not used since optional list is empty
+    "max_optional": 0,
 }
 
 # ============================================================================
@@ -166,14 +167,13 @@ def generate_facial_condition(seed: int | None = None) -> dict[str, str]:
     """Generate a facial signal condition using weighted random selection.
 
     This function applies the facial signal rule system:
-    1. No mandatory axes (all facial signals are optional)
-    2. Select 0-1 optional axes (controlled by policy)
-    3. Apply weighted probability distributions
-    4. Apply semantic exclusion rules (currently minimal)
-    5. Return structured condition data
+    1. Select mandatory facial_signal axis (always included)
+    2. Apply weighted probability distributions
+    3. Apply semantic exclusion rules (currently minimal)
+    4. Return structured condition data
 
-    NOTE: Returns empty dict if no facial signal is selected (50% chance with
-    max_optional=1). This is intentional - not all characters need facial signals.
+    NOTE: Always returns a facial signal. This ensures consistent behavior when
+    users explicitly request facial conditions - they always get one.
 
     Args:
         seed: Optional random seed for reproducible generation.
@@ -181,8 +181,8 @@ def generate_facial_condition(seed: int | None = None) -> dict[str, str]:
 
     Returns:
         Dictionary mapping axis names to selected values.
+        Always contains exactly one key: "facial_signal"
         Example: {"facial_signal": "weathered"}
-        Or: {} (no facial signal selected)
 
     Examples:
         >>> # Reproducible generation
@@ -195,9 +195,9 @@ def generate_facial_condition(seed: int | None = None) -> dict[str, str]:
         >>> generate_facial_condition()
         {'facial_signal': 'soft-featured'}
 
-        >>> # May return empty dict (no facial signal)
-        >>> generate_facial_condition()
-        {}
+        >>> # Always returns a facial signal
+        >>> generate_facial_condition(seed=123)
+        {'facial_signal': 'sharp-featured'}
     """
     # Set random seed for reproducibility if provided
     if seed is not None:
@@ -277,20 +277,21 @@ def facial_condition_to_prompt(condition_dict: dict[str, str]) -> str:
                        (output from generate_facial_condition)
 
     Returns:
-        Comma-separated string of condition values
-        (Currently only one value since max_optional=1)
+        Comma-separated string of condition values.
+        Since facial_signal is mandatory, always returns a single word
+        (e.g., "weathered", "sharp-featured")
 
     Examples:
         >>> facial_condition_to_prompt({"facial_signal": "weathered"})
         'weathered'
 
-        >>> facial_condition_to_prompt({})
-        ''
+        >>> facial_condition_to_prompt({"facial_signal": "sharp-featured"})
+        'sharp-featured'
 
     Notes:
         - Order is determined by dict iteration (Python 3.7+ preserves insertion order)
-        - Empty dict returns empty string
-        - With max_optional=1, output is always a single word or empty string
+        - Since facial_signal is mandatory, output is always a single word
+        - Empty dict returns empty string (for backward compatibility only)
     """
     if not condition_dict:
         return ""

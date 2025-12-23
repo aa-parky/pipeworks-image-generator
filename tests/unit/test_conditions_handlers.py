@@ -34,8 +34,9 @@ class TestGenerateConditionByType:
     def test_generate_facial_conditions(self):
         """Test facial condition generation."""
         result = generate_condition_by_type("Facial", seed=42)
-        # Note: Facial conditions can be empty (50% chance)
+        # Facial conditions are always generated (facial_signal is mandatory)
         assert isinstance(result, str)
+        assert len(result) > 0
 
     def test_generate_both_conditions(self):
         """Test combined condition generation."""
@@ -87,13 +88,13 @@ class TestGenerateConditionByType:
         result = generate_condition_by_type("InvalidType")
         assert result == ""
 
-    def test_facial_can_be_empty(self):
-        """Test that facial conditions can legitimately be empty."""
-        # Try multiple seeds, should get at least one empty result
+    def test_facial_never_empty(self):
+        """Test that facial conditions are never empty (facial_signal is mandatory)."""
+        # Try multiple seeds, should never get empty results
         results = [generate_condition_by_type("Facial", seed=seed) for seed in range(100)]
         empty_count = sum(1 for r in results if r == "")
-        # With max_optional=1, expect roughly 50% empty
-        assert empty_count > 20, f"Expected ~50% empty, got {empty_count}%"
+        # facial_signal is mandatory - should always generate
+        assert empty_count == 0, f"Expected 0 empty, got {empty_count} (facial_signal is mandatory)"
 
     def test_character_never_empty(self):
         """Test that character conditions are never empty."""
