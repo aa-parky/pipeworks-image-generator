@@ -11,7 +11,6 @@ from pipeworks.core.config import config
 from pipeworks.core.favorites_db import FavoritesDB
 from pipeworks.core.gallery_browser import GalleryBrowser
 from pipeworks.core.model_adapters import model_registry
-from pipeworks.core.pipeline import ImageGenerator  # Legacy support
 from pipeworks.core.prompt_builder import PromptBuilder
 from pipeworks.core.tokenizer import TokenizerAnalyzer
 
@@ -201,6 +200,7 @@ def switch_model(state: UIState, model_name: str) -> UIState:
 
             # Aggressive CUDA memory cleanup
             import torch
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()

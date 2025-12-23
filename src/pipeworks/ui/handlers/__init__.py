@@ -5,12 +5,16 @@ This package provides handlers for all Gradio UI events, organized into logical 
 - prompt: Prompt builder and file navigation
 - tokenizer: Tokenization analysis
 - gallery: Gallery browser, favorites, and catalog management
+- conditions: Character and facial condition generation
 """
 
 # Re-export all handlers to maintain backward compatibility
 # This allows existing imports like "from pipeworks.ui.handlers import generate_image"
 # to continue working
 
+from .conditions import (
+    generate_condition_by_type,
+)
 from .gallery import (
     apply_gallery_filter,
     initialize_gallery_browser,
@@ -41,6 +45,8 @@ from .tokenizer import (
 )
 
 __all__ = [
+    # Condition handlers
+    "generate_condition_by_type",
     # Generation handlers
     "generate_image",
     "get_available_models",

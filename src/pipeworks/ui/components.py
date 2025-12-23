@@ -2,7 +2,7 @@
 
 import gradio as gr
 
-from .models import SEGMENT_MODES, SegmentConfig
+from .models import CONDITION_TYPES, SEGMENT_MODES, SegmentConfig
 
 
 class SegmentUI:
@@ -241,15 +241,17 @@ def create_three_segments(initial_choices: list[str]) -> tuple[SegmentUI, Segmen
 
 
 class ConditionSegmentUI(SegmentUI):
-    """Extended segment UI with character condition generation support.
+    """Extended segment UI with character/facial condition generation support.
 
     This extends the base SegmentUI with additional controls for generating
-    character conditions (physique, wealth, health, etc.) using the
-    character_conditions system.
+    character conditions (physique, wealth, etc.) and/or facial conditions
+    (sharp-featured, weathered, etc.) using the condition systems.
 
     Additional controls:
-    - Checkbox to enable auto-generation
+    - Dropdown to select condition type (None/Character/Facial/Both)
     - Display field for generated condition text (editable)
+    - Regenerate button to create new random conditions
+    - Dynamic checkbox to regenerate per image
     - Condition text concatenates with manual text input
     """
 
@@ -257,7 +259,7 @@ class ConditionSegmentUI(SegmentUI):
         """Initialize a condition-enabled segment UI component.
 
         Args:
-            name: Name of the segment (e.g., "Start 1")
+            name: Name of the segment (e.g., "Start 2")
             initial_choices: Initial file/folder choices for dropdown
         """
         self.name = name
@@ -267,21 +269,24 @@ class ConditionSegmentUI(SegmentUI):
             self.title = gr.Markdown(f"**{name} Segment**")
 
             # ================================================================
-            # CHARACTER CONDITION CONTROLS (above text input)
+            # CONDITION GENERATION CONTROLS (above text input)
             # ================================================================
             with gr.Group():
-                gr.Markdown("**Character Condition Generator**")
+                gr.Markdown("**Condition Generator**")
 
-                self.condition_enabled = gr.Checkbox(
-                    label="Auto-generate condition",
-                    value=False,
-                    info="Generate character state (physique, wealth, etc.)",
+                # Dropdown to select condition type
+                self.condition_type = gr.Dropdown(
+                    label="Condition Type",
+                    choices=CONDITION_TYPES,
+                    value="None",
+                    info="Select type of conditions to generate",
                 )
 
+                # Condition controls (hidden until type is selected)
                 with gr.Row(visible=False) as self.condition_controls:
                     self.condition_text = gr.Textbox(
                         label="Generated Condition",
-                        placeholder="Click generate to create condition...",
+                        placeholder="Select condition type to generate...",
                         lines=1,
                         interactive=True,
                         info="Edit generated text or leave blank",
@@ -349,15 +354,15 @@ class ConditionSegmentUI(SegmentUI):
 
     def get_condition_components(
         self,
-    ) -> tuple[gr.Checkbox, gr.Textbox, gr.Button, gr.Checkbox, gr.Row]:
+    ) -> tuple[gr.Dropdown, gr.Textbox, gr.Button, gr.Checkbox, gr.Row]:
         """Return condition generation components.
 
         Returns:
-            Tuple of (condition_enabled checkbox, condition_text textbox,
+            Tuple of (condition_type dropdown, condition_text textbox,
                      regenerate button, condition_dynamic checkbox, condition_controls row)
         """
         return (
-            self.condition_enabled,
+            self.condition_type,
             self.condition_text,
             self.condition_regenerate,
             self.condition_dynamic,
@@ -380,22 +385,22 @@ def create_nine_segments(
 ]:
     """Create nine segment UI components arranged in 3x3 grid.
 
-    NOTE: Start 1 uses ConditionSegmentUI (extends SegmentUI) which includes
-    character condition generation controls.
+    NOTE: Start 2 and Start 3 use ConditionSegmentUI (extends SegmentUI) which includes
+    character/facial condition generation controls. Start 1 is a standard segment.
 
     Args:
         initial_choices: Initial file/folder choices for dropdowns
 
     Returns:
         Tuple of 9 segments: (start_1, start_2, start_3, mid_1, mid_2, mid_3, end_1, end_2, end_3)
-        Note: start_1 is a ConditionSegmentUI, others are SegmentUI
+        Note: start_2 and start_3 are ConditionSegmentUI, others are SegmentUI
     """
-    # Start 1 has condition generation support
-    start_1 = ConditionSegmentUI("Start 1", initial_choices)
+    # Start 1 is now a standard segment (no conditions)
+    start_1 = SegmentUI("Start 1", initial_choices)
 
-    # Other segments are standard
-    start_2 = SegmentUI("Start 2", initial_choices)
-    start_3 = SegmentUI("Start 3", initial_choices)
+    # Start 2 and Start 3 have condition generation support
+    start_2 = ConditionSegmentUI("Start 2", initial_choices)
+    start_3 = ConditionSegmentUI("Start 3", initial_choices)
 
     mid_1 = SegmentUI("Mid 1", initial_choices)
     mid_2 = SegmentUI("Mid 2", initial_choices)

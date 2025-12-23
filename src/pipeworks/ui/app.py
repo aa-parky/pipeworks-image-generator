@@ -10,8 +10,6 @@ from pipeworks.plugins.base import plugin_registry
 from .components import (
     ConditionSegmentUI,
     SegmentUI,
-    create_nine_segments,
-    create_three_segments,
     update_mode_visibility,
 )
 from .handlers import (
@@ -145,9 +143,7 @@ def create_generation_tab(ui_state):
                 value=config.default_model_adapter,
                 info="Select AI model for generation",
             )
-            model_status = gr.Markdown(
-                value=f"✅ **Current:** {config.default_model_adapter}"
-            )
+            model_status = gr.Markdown(value=f"✅ **Current:** {config.default_model_adapter}")
 
             # Image Editing Section (visible only for image-edit models like Qwen)
             with gr.Group(visible=False) as image_edit_group:
@@ -419,106 +415,141 @@ def create_generation_tab(ui_state):
             outputs=[line, range_end, count, sequential_start_line],
         )
 
-    # Character condition generation handlers (Start 1 only)
-    def toggle_condition_handler(enabled: bool) -> tuple[str, gr.update]:
+    # =========================================================================
+    # Condition generation handlers (Start 2 and Start 3)
+    # =========================================================================
+
+    def toggle_condition_type_handler(condition_type: str) -> tuple[str, gr.update]:
         """Show/hide condition controls and generate initial condition.
 
         Uses random seed by default for variety.
 
         Args:
-            enabled: Whether condition generation is enabled
+            condition_type: Type of condition ("None", "Character", "Facial", "Both")
 
         Returns:
             Tuple of (condition_text, controls_visibility_update)
         """
-        if enabled:
-            # Import here to avoid circular dependency
-            from pipeworks.core.character_conditions import (
-                condition_to_prompt,
-                generate_condition,
-            )
+        from pipeworks.ui.handlers import generate_condition_by_type
 
+        if condition_type == "None":
+            # Hide the condition controls and clear text
+            return "", gr.update(visible=False)
+        else:
             # Generate condition using random seed (None = system entropy)
-            condition = generate_condition(seed=None)
-            condition_text = condition_to_prompt(condition)
+            condition_text = generate_condition_by_type(condition_type, seed=None)
 
             # Show the condition controls
             return condition_text, gr.update(visible=True)
-        else:
-            # Hide the condition controls and clear text
-            return "", gr.update(visible=False)
 
-    def regenerate_condition_handler() -> str:
+    def regenerate_condition_type_handler(condition_type: str) -> str:
         """Generate a new random condition when regenerate button is clicked.
+
+        Args:
+            condition_type: Type of condition to generate
 
         Returns:
             New condition text
         """
-        from pipeworks.core.character_conditions import (
-            condition_to_prompt,
-            generate_condition,
-        )
+        from pipeworks.ui.handlers import generate_condition_by_type
 
         # Always use random seed for variety
-        condition = generate_condition(seed=None)
-        return condition_to_prompt(condition)
+        return generate_condition_by_type(condition_type, seed=None)
 
-    # Wire up condition generation for Start 1
+    # Wire up condition generation for Start 2
     (
-        condition_enabled,
-        condition_text,
-        condition_regenerate,
-        condition_dynamic,
-        condition_controls,
-    ) = start_1.get_condition_components()
+        condition_type_2,
+        condition_text_2,
+        condition_regenerate_2,
+        condition_dynamic_2,
+        condition_controls_2,
+    ) = start_2.get_condition_components()
 
-    # Toggle handler: show/hide controls and generate initial condition
-    condition_enabled.change(
-        fn=toggle_condition_handler,
-        inputs=[condition_enabled],
-        outputs=[condition_text, condition_controls],
+    # Dropdown change: show/hide controls and generate initial condition
+    condition_type_2.change(
+        fn=toggle_condition_type_handler,
+        inputs=[condition_type_2],
+        outputs=[condition_text_2, condition_controls_2],
     )
 
     # Regenerate button: create new random condition
-    condition_regenerate.click(
-        fn=regenerate_condition_handler,
-        inputs=[],
-        outputs=[condition_text],
+    condition_regenerate_2.click(
+        fn=regenerate_condition_type_handler,
+        inputs=[condition_type_2],
+        outputs=[condition_text_2],
+    )
+
+    # Wire up condition generation for Start 3
+    (
+        condition_type_3,
+        condition_text_3,
+        condition_regenerate_3,
+        condition_dynamic_3,
+        condition_controls_3,
+    ) = start_3.get_condition_components()
+
+    # Dropdown change: show/hide controls and generate initial condition
+    condition_type_3.change(
+        fn=toggle_condition_type_handler,
+        inputs=[condition_type_3],
+        outputs=[condition_text_3, condition_controls_3],
+    )
+
+    # Regenerate button: create new random condition
+    condition_regenerate_3.click(
+        fn=regenerate_condition_type_handler,
+        inputs=[condition_type_3],
+        outputs=[condition_text_3],
     )
 
     # Build prompt button handler
     def build_and_update_prompt(*values):
         """Build prompt from segment values and update UI.
 
-        Now includes condition text concatenation for Start 1.
+        Now includes condition text concatenation for Start 2 and Start 3.
         """
-        # Extract condition inputs (first three values)
-        condition_enabled_val = values[0]
-        condition_text_val = values[1]
-        condition_dynamic_val = values[2]
-
         # Split values into segment groups (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        # Values now start at index 3 because of condition inputs
-        start_1_values = list(values[3:12])
-        start_2_values = values[12:21]
-        start_3_values = values[21:30]
-        mid_1_values = values[30:39]
-        mid_2_values = values[39:48]
-        mid_3_values = values[48:57]
-        end_1_values = values[57:66]
-        end_2_values = values[66:75]
-        end_3_values = values[75:84]
-        state = values[84]
+        start_1_values = list(values[0:9])
 
-        # Concatenate condition text with Start 1 text if condition is enabled
+        # Start 2 with conditions (3 condition values + 9 segment values)
+        condition_type_2_val = values[9]
+        condition_text_2_val = values[10]
+        # Skip condition_dynamic_2 (index 11) - only used during generation, not preview
+        start_2_values = list(values[12:21])
+
+        # Start 3 with conditions (3 condition values + 9 segment values)
+        condition_type_3_val = values[21]
+        condition_text_3_val = values[22]
+        # Skip condition_dynamic_3 (index 23) - only used during generation, not preview
+        start_3_values = list(values[24:33])
+
+        # Remaining segments
+        mid_1_values = values[33:42]
+        mid_2_values = values[42:51]
+        mid_3_values = values[51:60]
+        end_1_values = values[60:69]
+        end_2_values = values[69:78]
+        end_3_values = values[78:87]
+        state = values[87]
+
+        # Concatenate condition text with Start 2 text if condition is enabled
         # Show the condition in the prompt preview (even if dynamic - it will be regenerated during generation)
-        if condition_enabled_val and condition_text_val:
+        if condition_type_2_val != "None" and condition_text_2_val:
             # Condition text comes first, then user text (if any)
-            original_text = start_1_values[0]  # First value is text
+            original_text = start_2_values[0]  # First value is text
             if original_text and original_text.strip():
-                start_1_values[0] = f"{condition_text_val}, {original_text}"
+                start_2_values[0] = f"{condition_text_2_val}, {original_text}"
             else:
-                start_1_values[0] = condition_text_val
+                start_2_values[0] = condition_text_2_val
+
+        # Concatenate condition text with Start 3 text if condition is enabled
+        if condition_type_3_val != "None" and condition_text_3_val:
+            # Condition text comes first, then user text (if any)
+            original_text = start_3_values[0]  # First value is text
+            if original_text and original_text.strip():
+                start_3_values[0] = f"{condition_text_3_val}, {original_text}"
+            else:
+                start_3_values[0] = condition_text_3_val
 
         # Convert to SegmentConfig objects
         start_1_cfg = SegmentUI.values_to_config(*start_1_values)
@@ -595,12 +626,13 @@ def create_generation_tab(ui_state):
         )
 
     # Collect all segment inputs
-    # NOTE: Start 1 condition components must come first (used in build_and_update_prompt)
+    # NOTE: Start 2 and Start 3 condition components are interspersed with their segment inputs
     # (condition components already extracted above for handlers)
     all_segment_inputs = (
-        [condition_enabled, condition_text, condition_dynamic]  # Condition inputs for Start 1
-        + start_1.get_input_components()
+        start_1.get_input_components()  # Start 1 (no conditions)
+        + [condition_type_2, condition_text_2, condition_dynamic_2]  # Condition inputs for Start 2
         + start_2.get_input_components()
+        + [condition_type_3, condition_text_3, condition_dynamic_3]  # Condition inputs for Start 3
         + start_3.get_input_components()
         + mid_1.get_input_components()
         + mid_2.get_input_components()
@@ -647,9 +679,9 @@ def create_generation_tab(ui_state):
     def generate_wrapper(*values):
         """Wrapper to convert segment values to SegmentConfig objects.
 
-        Now includes condition text concatenation for Start 1.
+        Now includes condition text concatenation for Start 2 and Start 3.
         """
-        # Extract values - now includes image editing inputs (3 images) + condition inputs (2)
+        # Extract values - includes image editing inputs (3 images + instruction)
         input_img_1 = values[0]
         input_img_2 = values[1]
         input_img_3 = values[2]
@@ -663,33 +695,50 @@ def create_generation_tab(ui_state):
         seed = values[10]
         use_random_seed = values[11]
 
-        # Condition inputs (for Start 1)
-        condition_enabled_val = values[12]
-        condition_text_val = values[13]
-        condition_dynamic_val = values[14]
-
         # Segment values (9 values each: text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        # Indices shifted by 3 due to condition inputs
-        start_1_values = list(values[15:24])
-        start_2_values = values[24:33]
-        start_3_values = values[33:42]
-        mid_1_values = values[42:51]
-        mid_2_values = values[51:60]
-        mid_3_values = values[60:69]
-        end_1_values = values[69:78]
-        end_2_values = values[78:87]
-        end_3_values = values[87:96]
-        state = values[96]
+        # Start 1 (no conditions)
+        start_1_values = list(values[12:21])
 
-        # Concatenate condition text with Start 1 text if condition is enabled
+        # Start 2 with conditions (3 condition values + 9 segment values)
+        condition_type_2_val = values[21]
+        condition_text_2_val = values[22]
+        condition_dynamic_2_val = values[23]
+        start_2_values = list(values[24:33])
+
+        # Start 3 with conditions (3 condition values + 9 segment values)
+        condition_type_3_val = values[33]
+        condition_text_3_val = values[34]
+        condition_dynamic_3_val = values[35]
+        start_3_values = list(values[36:45])
+
+        # Remaining segments
+        mid_1_values = values[45:54]
+        mid_2_values = values[54:63]
+        mid_3_values = values[63:72]
+        end_1_values = values[72:81]
+        end_2_values = values[81:90]
+        end_3_values = values[90:99]
+        state = values[99]
+
+        # Concatenate condition text with Start 2 text if condition is enabled
         # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
-        if condition_enabled_val and condition_text_val and not condition_dynamic_val:
+        if condition_type_2_val != "None" and condition_text_2_val and not condition_dynamic_2_val:
             # Condition text comes first, then user text (if any)
-            original_text = start_1_values[0]  # First value is text
+            original_text = start_2_values[0]  # First value is text
             if original_text and original_text.strip():
-                start_1_values[0] = f"{condition_text_val}, {original_text}"
+                start_2_values[0] = f"{condition_text_2_val}, {original_text}"
             else:
-                start_1_values[0] = condition_text_val
+                start_2_values[0] = condition_text_2_val
+
+        # Concatenate condition text with Start 3 text if condition is enabled
+        # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
+        if condition_type_3_val != "None" and condition_text_3_val and not condition_dynamic_3_val:
+            # Condition text comes first, then user text (if any)
+            original_text = start_3_values[0]  # First value is text
+            if original_text and original_text.strip():
+                start_3_values[0] = f"{condition_text_3_val}, {original_text}"
+            else:
+                start_3_values[0] = condition_text_3_val
 
         # Convert to SegmentConfig objects
         start_1_cfg = SegmentUI.values_to_config(*start_1_values)
@@ -705,7 +754,7 @@ def create_generation_tab(ui_state):
         # Collect input images (filter out None values)
         input_images = [img for img in [input_img_1, input_img_2, input_img_3] if img is not None]
 
-        # Call generate_image with clean parameters (includes image editing params)
+        # Call generate_image with clean parameters (includes image editing params and conditions)
         return generate_image(
             prompt,
             width,
@@ -727,9 +776,14 @@ def create_generation_tab(ui_state):
             state,
             input_images=input_images if input_images else None,
             instruction=instruction,
-            condition_enabled=condition_enabled_val,
-            condition_text=condition_text_val,
-            condition_dynamic=condition_dynamic_val,
+            # Condition parameters for Start 2
+            condition_type_2=condition_type_2_val,
+            condition_text_2=condition_text_2_val,
+            condition_dynamic_2=condition_dynamic_2_val,
+            # Condition parameters for Start 3
+            condition_type_3=condition_type_3_val,
+            condition_text_3=condition_text_3_val,
+            condition_dynamic_3=condition_dynamic_3_val,
         )
 
     # Collect all inputs for generation (includes image editing inputs)

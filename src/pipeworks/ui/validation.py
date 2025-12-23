@@ -89,9 +89,7 @@ def validate_segment_path(path: str, file: str, base_dir: Path) -> Path:
     return full_path
 
 
-def validate_segments(
-    segments: tuple[SegmentConfig, ...], base_dir: Path, prompt: str
-) -> None:
+def validate_segments(segments: tuple[SegmentConfig, ...], base_dir: Path, prompt: str) -> None:
     """Validate all segment configurations.
 
     Ensures that either:

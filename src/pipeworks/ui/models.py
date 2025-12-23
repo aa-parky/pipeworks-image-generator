@@ -25,6 +25,11 @@ class SegmentConfig:
     dynamic: bool = False
     sequential_start_line: int = 1  # Starting line for Sequential mode
 
+    # Character/Facial condition generation (for Start segments)
+    condition_type: str = "None"  # "None", "Character", "Facial", or "Both"
+    condition_text: str = ""  # Generated condition text
+    condition_dynamic: bool = False  # Regenerate condition per image
+
     def is_configured(self) -> bool:
         """Check if segment has a valid file selected.
 
@@ -207,3 +212,11 @@ ASPECT_RATIOS = {
 # UI Constants
 MAX_SEED = 2**32 - 1
 DEFAULT_SEED = 42
+
+# Condition generation types
+CONDITION_TYPES = [
+    "None",  # No condition generation
+    "Character",  # Generate character conditions (physique, wealth, etc.)
+    "Facial",  # Generate facial signal conditions
+    "Both",  # Generate both character and facial conditions
+]
