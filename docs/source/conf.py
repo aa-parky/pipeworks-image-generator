@@ -7,29 +7,29 @@ import os
 import sys
 
 # Add project root to sys.path so Sphinx can find the package
-sys.path.insert(0, os.path.abspath('../..'))
-sys.path.insert(0, os.path.abspath('../../src'))
+sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath("../../src"))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Pipeworks Image Generator'
-copyright = '2025, aapark'
-author = 'aapark'
+project = "Pipeworks Image Generator"
+copyright = "2025, aapark"
+author = "aapark"
 
-version = '0.1.0'
-release = '0.1.0'
+version = "0.1.0"
+release = "0.1.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.todo',
-    'sphinx.ext.napoleon',  # Support for NumPy and Google style docstrings
-    'sphinx_autodoc_typehints',  # Better type hints support
-    'myst_parser',  # Markdown support
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.todo",
+    "sphinx.ext.napoleon",  # Support for NumPy and Google style docstrings
+    "sphinx_autodoc_typehints",  # Better type hints support
+    "myst_parser",  # Markdown support
 ]
 
 # MyST parser configuration (for Markdown files)
@@ -50,28 +50,28 @@ myst_enable_extensions = [
 
 # Source file suffixes
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
+    ".rst": "restructuredtext",
+    ".md": "markdown",
 }
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
-language = 'en'
+language = "en"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
 
 # Theme options
 html_theme_options = {
-    'navigation_depth': 4,
-    'collapse_navigation': False,
-    'sticky_navigation': True,
-    'includehidden': True,
-    'titles_only': False,
+    "navigation_depth": 4,
+    "collapse_navigation": False,
+    "sticky_navigation": True,
+    "includehidden": True,
+    "titles_only": False,
 }
 
 # -- Options for todo extension ----------------------------------------------
@@ -82,11 +82,11 @@ todo_include_todos = True
 # -- Options for autodoc extension -------------------------------------------
 
 autodoc_default_options = {
-    'members': True,
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
-    'exclude-members': '__weakref__'
+    "members": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "exclude-members": "__weakref__",
 }
 
 # -- Options for napoleon extension ------------------------------------------

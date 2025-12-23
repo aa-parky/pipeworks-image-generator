@@ -1,13 +1,13 @@
 """Integration tests for UI components."""
 
-import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
 import gradio as gr
 
 from pipeworks.ui.components import (
     SegmentUI,
-    update_mode_visibility,
     create_three_segments,
+    update_mode_visibility,
 )
 from pipeworks.ui.models import SegmentConfig
 
@@ -17,15 +17,16 @@ class TestSegmentUI:
 
     def test_segment_ui_creation(self):
         """Test that SegmentUI can be created."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown') as MockMarkdown, \
-             patch('gradio.Textbox') as MockTextbox, \
-             patch('gradio.Dropdown') as MockDropdown, \
-             patch('gradio.Checkbox') as MockCheckbox, \
-             patch('gradio.Number') as MockNumber, \
-             patch('gradio.State') as MockState, \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown") as MockMarkdown,
+            patch("gradio.Textbox") as MockTextbox,
+            patch("gradio.Dropdown") as MockDropdown,
+            patch("gradio.Checkbox") as MockCheckbox,
+            patch("gradio.Number") as MockNumber,
+            patch("gradio.State") as MockState,
+            patch("gradio.Row"),
+        ):
             segment = SegmentUI("Test", ["(None)", "file1.txt"])
 
             assert segment.name == "Test"
@@ -35,31 +36,34 @@ class TestSegmentUI:
 
     def test_get_input_components(self):
         """Test that get_input_components returns correct components."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown'), \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown"),
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             segment = SegmentUI("Test", ["(None)"])
             inputs = segment.get_input_components()
 
-            assert len(inputs) == 9  # text, path_state, file, mode, line, range_end, count, dynamic, sequential_start_line
+            # text, path_state, file, mode, line, range_end, count, dynamic, sequential_start_line
+            assert len(inputs) == 9
 
     def test_get_output_components(self):
         """Test that get_output_components returns correct components."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown'), \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown"),
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             segment = SegmentUI("Test", ["(None)"])
             outputs = segment.get_output_components()
 
@@ -67,15 +71,16 @@ class TestSegmentUI:
 
     def test_get_navigation_components(self):
         """Test that get_navigation_components returns correct tuple."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown'), \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown"),
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             segment = SegmentUI("Test", ["(None)"])
             file, path_state, path_display = segment.get_navigation_components()
 
@@ -85,15 +90,16 @@ class TestSegmentUI:
 
     def test_get_mode_visibility_outputs(self):
         """Test that get_mode_visibility_outputs returns correct tuple."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown'), \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown"),
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             segment = SegmentUI("Test", ["(None)"])
             line, range_end, count, sequential_start_line = segment.get_mode_visibility_outputs()
 
@@ -113,7 +119,7 @@ class TestSegmentUI:
             10,
             3,
             True,
-            2  # sequential_start_line
+            2,  # sequential_start_line
         )
 
         assert isinstance(config, SegmentConfig)
@@ -138,7 +144,7 @@ class TestSegmentUI:
             None,  # range_end
             None,  # count
             False,
-            None  # sequential_start_line
+            None,  # sequential_start_line
         )
 
         assert config.line == 1  # Default
@@ -242,15 +248,16 @@ class TestCreateThreeSegments:
 
     def test_creates_three_segments(self):
         """Test that three SegmentUI instances are created."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown'), \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown"),
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             start, middle, end = create_three_segments(["(None)", "file.txt"])
 
             assert isinstance(start, SegmentUI)
@@ -259,15 +266,16 @@ class TestCreateThreeSegments:
 
     def test_segments_have_correct_names(self):
         """Test that segments have correct names."""
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown'), \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown"),
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             start, middle, end = create_three_segments(["(None)"])
 
             assert start.name == "Start"
@@ -278,15 +286,16 @@ class TestCreateThreeSegments:
         """Test that all segments receive the same initial choices."""
         choices = ["(None)", "file1.txt", "file2.txt"]
 
-        with patch('gradio.Group'), \
-             patch('gradio.Markdown'), \
-             patch('gradio.Textbox'), \
-             patch('gradio.Dropdown') as MockDropdown, \
-             patch('gradio.Checkbox'), \
-             patch('gradio.Number'), \
-             patch('gradio.State'), \
-             patch('gradio.Row'):
-
+        with (
+            patch("gradio.Group"),
+            patch("gradio.Markdown"),
+            patch("gradio.Textbox"),
+            patch("gradio.Dropdown") as MockDropdown,
+            patch("gradio.Checkbox"),
+            patch("gradio.Number"),
+            patch("gradio.State"),
+            patch("gradio.Row"),
+        ):
             start, middle, end = create_three_segments(choices)
 
             # Each segment should have created a Dropdown with the choices

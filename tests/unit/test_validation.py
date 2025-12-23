@@ -1,17 +1,16 @@
 """Unit tests for validation utilities."""
 
 import pytest
-from pathlib import Path
 
+from pipeworks.ui.models import GenerationParams, SegmentConfig
 from pipeworks.ui.validation import (
     ValidationError,
+    sanitize_filename_input,
     validate_generation_params,
+    validate_prompt_content,
     validate_segment_path,
     validate_segments,
-    validate_prompt_content,
-    sanitize_filename_input,
 )
-from pipeworks.ui.models import GenerationParams, SegmentConfig
 
 
 class TestValidationError:
@@ -50,7 +49,7 @@ class TestValidateGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValidationError):
@@ -66,7 +65,7 @@ class TestValidateGenerationParams:
             batch_size=150,  # Invalid
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValidationError) as exc_info:
@@ -134,7 +133,7 @@ class TestValidateSegmentPath:
             # Manually construct path to bypass emoji check
             full_path = test_inputs_dir / "testdir"
             if not full_path.is_file():
-                raise ValidationError(f"Path is not a file: testdir")
+                raise ValidationError("Path is not a file: testdir")
 
     def test_symlink_security(self, test_inputs_dir, temp_dir):
         """Test that symlinks outside base_dir are blocked."""
@@ -217,7 +216,9 @@ class TestValidateSegments:
         segments = (segment, SegmentConfig(), SegmentConfig())
         prompt = "some prompt"  # Need prompt to pass first validation check
 
-        with pytest.raises(ValidationError, match="Dynamic mode is enabled but no segments have files"):
+        with pytest.raises(
+            ValidationError, match="Dynamic mode is enabled but no segments have files"
+        ):
             validate_segments(segments, test_inputs_dir, prompt)
 
     def test_dynamic_with_configured_file_passes(self, test_inputs_dir):

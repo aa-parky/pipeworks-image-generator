@@ -114,7 +114,7 @@ class TestDataStructures:
             # All weighted values should exist in the axis
             for value, weight in weight_dict.items():
                 assert value in FACIAL_AXES[axis], f"Weighted value '{value}' not in axis '{axis}'"
-                assert isinstance(weight, (int, float))
+                assert isinstance(weight, int | float)
                 assert weight > 0, f"Weight for {axis}.{value} must be positive"
 
     def test_facial_weights_complete_coverage(self):
@@ -582,7 +582,9 @@ class TestStatisticalProperties:
         empty_count = sum(1 for r in results if len(r) == 0)
 
         # Should never be empty - facial_signal is always generated
-        assert empty_count == 0, f"Found {empty_count} empty results - expected 0 (facial_signal is mandatory)"
+        assert (
+            empty_count == 0
+        ), f"Found {empty_count} empty results - expected 0 (facial_signal is mandatory)"
 
     def test_all_signals_can_appear(self):
         """Test that all facial signals can appear over many generations."""

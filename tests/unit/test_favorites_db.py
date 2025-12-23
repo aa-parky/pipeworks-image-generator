@@ -1,8 +1,7 @@
 """Unit tests for FavoritesDB."""
 
-import pytest
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 
 from pipeworks.core.favorites_db import FavoritesDB
 
@@ -23,9 +22,7 @@ class TestFavoritesDB:
             cursor = conn.cursor()
 
             # Check table exists
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='favorites'"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='favorites'")
             assert cursor.fetchone() is not None
 
             # Check index exists

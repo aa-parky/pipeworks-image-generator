@@ -56,6 +56,13 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
+# Relax rules for test files - Mock naming and unused vars are ok in tests
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "N806",  # Allow MockClass naming in tests
+    "F841",  # Allow unused variables in tests (mock setup)
+]
+
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true

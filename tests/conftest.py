@@ -1,10 +1,11 @@
 """Shared pytest fixtures for Pipeworks tests."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
-from typing import Generator
+import tempfile
+from collections.abc import Generator
+from pathlib import Path
+
+import pytest
 
 from pipeworks.core.config import PipeworksConfig
 from pipeworks.ui.models import GenerationParams, SegmentConfig, UIState
@@ -110,7 +111,7 @@ def valid_generation_params() -> GenerationParams:
         batch_size=1,
         runs=1,
         seed=42,
-        use_random_seed=False
+        use_random_seed=False,
     )
 
 
@@ -129,7 +130,7 @@ def valid_segment_config() -> SegmentConfig:
         line=1,
         range_end=1,
         count=1,
-        dynamic=False
+        dynamic=False,
     )
 
 

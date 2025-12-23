@@ -1,6 +1,5 @@
 """Unit tests for CatalogManager."""
 
-import pytest
 from pathlib import Path
 
 from pipeworks.core.catalog_manager import CatalogManager

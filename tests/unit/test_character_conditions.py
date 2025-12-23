@@ -28,7 +28,6 @@ from pipeworks.core.character_conditions import (
     weighted_choice,
 )
 
-
 # ============================================================================
 # Test Data Structures
 # ============================================================================
@@ -94,7 +93,7 @@ class TestDataStructures:
                 assert (
                     value in CONDITION_AXES[axis]
                 ), f"Weighted value '{value}' not in axis '{axis}'"
-                assert isinstance(weight, (int, float))
+                assert isinstance(weight, int | float)
                 assert weight > 0, f"Weight for {axis}.{value} must be positive"
 
     def test_exclusions_structure(self):
@@ -111,9 +110,7 @@ class TestDataStructures:
             # Blocked axes/values should exist
             assert isinstance(blocked, dict)
             for blocked_axis, blocked_values in blocked.items():
-                assert (
-                    blocked_axis in CONDITION_AXES
-                ), f"Blocked axis '{blocked_axis}' not defined"
+                assert blocked_axis in CONDITION_AXES, f"Blocked axis '{blocked_axis}' not defined"
                 for blocked_value in blocked_values:
                     assert (
                         blocked_value in CONDITION_AXES[blocked_axis]
@@ -216,9 +213,7 @@ class TestGenerateCondition:
 
             for axis, value in result.items():
                 assert axis in CONDITION_AXES, f"Invalid axis '{axis}' in result"
-                assert (
-                    value in CONDITION_AXES[axis]
-                ), f"Invalid value '{value}' for axis '{axis}'"
+                assert value in CONDITION_AXES[axis], f"Invalid value '{value}' for axis '{axis}'"
 
     def test_generate_condition_reproducible_with_seed(self):
         """Test that same seed produces same condition."""

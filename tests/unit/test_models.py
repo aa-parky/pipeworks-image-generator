@@ -1,13 +1,14 @@
 """Unit tests for UI data models."""
 
 import pytest
+
 from pipeworks.ui.models import (
+    ASPECT_RATIOS,
+    DEFAULT_SEED,
+    MAX_SEED,
     GenerationParams,
     SegmentConfig,
     UIState,
-    ASPECT_RATIOS,
-    MAX_SEED,
-    DEFAULT_SEED,
 )
 
 
@@ -37,7 +38,7 @@ class TestSegmentConfig:
             line=5,
             range_end=10,
             count=3,
-            dynamic=True
+            dynamic=True,
         )
 
         assert segment.text == "custom text"
@@ -112,7 +113,7 @@ class TestGenerationParams:
             batch_size=0,  # Invalid
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Batch size must be 1-100"):
@@ -128,7 +129,7 @@ class TestGenerationParams:
             batch_size=150,  # Invalid
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Batch size must be 1-100"):
@@ -144,7 +145,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=0,  # Invalid
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Runs must be 1-100"):
@@ -160,7 +161,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=150,  # Invalid
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Runs must be 1-100"):
@@ -176,7 +177,7 @@ class TestGenerationParams:
             batch_size=50,
             runs=50,  # 50 * 50 = 2500 > 1000
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="exceeds maximum of 1000"):
@@ -192,7 +193,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Width must be multiple of 64"):
@@ -208,7 +209,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Height must be multiple of 64"):
@@ -224,7 +225,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Width must be 512-2048"):
@@ -240,7 +241,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Width must be 512-2048"):
@@ -256,7 +257,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Height must be 512-2048"):
@@ -272,7 +273,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Height must be 512-2048"):
@@ -288,7 +289,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Inference steps must be 1-50"):
@@ -304,7 +305,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Inference steps must be 1-50"):
@@ -320,7 +321,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=-1,  # Invalid
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Seed must be 0 to"):
@@ -336,7 +337,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=2**32,  # Too large
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         with pytest.raises(ValueError, match="Seed must be 0 to"):
@@ -352,7 +353,7 @@ class TestGenerationParams:
             batch_size=5,
             runs=3,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
 
         assert params.total_images == 15  # 5 * 3
@@ -368,7 +369,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
         params_min.validate()  # Should not raise
 
@@ -381,7 +382,7 @@ class TestGenerationParams:
             batch_size=1,
             runs=1,
             seed=42,
-            use_random_seed=False
+            use_random_seed=False,
         )
         params_max.validate()  # Should not raise
 

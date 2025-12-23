@@ -1,8 +1,5 @@
 """Integration tests for prompt builder functionality."""
 
-import pytest
-from pathlib import Path
-
 from pipeworks.core.prompt_builder import PromptBuilder
 
 

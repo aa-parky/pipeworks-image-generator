@@ -10,8 +10,6 @@ Test coverage includes:
 - Condition type validation
 """
 
-import pytest
-
 from pipeworks.ui.handlers.conditions import generate_condition_by_type
 
 

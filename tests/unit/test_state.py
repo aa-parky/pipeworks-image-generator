@@ -1,15 +1,14 @@
 """Unit tests for UI state management."""
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
-from pipeworks.ui.state import (
-    initialize_ui_state,
-    update_generator_plugins,
-    toggle_plugin,
-    cleanup_ui_state,
-)
 from pipeworks.ui.models import UIState
+from pipeworks.ui.state import (
+    cleanup_ui_state,
+    initialize_ui_state,
+    toggle_plugin,
+    update_generator_plugins,
+)
 
 
 class TestInitializeUIState:
@@ -17,13 +16,14 @@ class TestInitializeUIState:
 
     def test_initialize_none_creates_new_state(self):
         """Test that passing None creates a new UIState."""
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer'), \
-             patch('pipeworks.ui.state.PromptBuilder'), \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer"),
+            patch("pipeworks.ui.state.PromptBuilder"),
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+        ):
             mock_registry.instantiate.return_value = Mock()
 
             result = initialize_ui_state(None)
@@ -47,14 +47,15 @@ class TestInitializeUIState:
         """Test that model adapter is created if None."""
         state = UIState()
 
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer') as MockTok, \
-             patch('pipeworks.ui.state.PromptBuilder') as MockPB, \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer") as MockTok,
+            patch("pipeworks.ui.state.PromptBuilder") as MockPB,
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_adapter = Mock()
             mock_adapter.load_model = Mock()
             mock_registry.instantiate.return_value = mock_adapter
@@ -68,14 +69,15 @@ class TestInitializeUIState:
         """Test that tokenizer is created if None."""
         state = UIState()
 
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer') as MockTok, \
-             patch('pipeworks.ui.state.PromptBuilder'), \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer") as MockTok,
+            patch("pipeworks.ui.state.PromptBuilder"),
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_registry.instantiate.return_value = Mock()
             mock_tok = Mock()
             MockTok.return_value = mock_tok
@@ -89,14 +91,15 @@ class TestInitializeUIState:
         """Test that prompt builder is created if None."""
         state = UIState()
 
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer'), \
-             patch('pipeworks.ui.state.PromptBuilder') as MockPB, \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer"),
+            patch("pipeworks.ui.state.PromptBuilder") as MockPB,
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_registry.instantiate.return_value = Mock()
             mock_pb = Mock()
             MockPB.return_value = mock_pb
@@ -110,14 +113,15 @@ class TestInitializeUIState:
         """Test that model loading is attempted."""
         state = UIState()
 
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer'), \
-             patch('pipeworks.ui.state.PromptBuilder'), \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer"),
+            patch("pipeworks.ui.state.PromptBuilder"),
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_adapter = Mock()
             mock_registry.instantiate.return_value = mock_adapter
 
@@ -129,14 +133,15 @@ class TestInitializeUIState:
         """Test that model load failure is handled gracefully."""
         state = UIState()
 
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer'), \
-             patch('pipeworks.ui.state.PromptBuilder'), \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer"),
+            patch("pipeworks.ui.state.PromptBuilder"),
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_adapter = Mock()
             mock_adapter.load_model.side_effect = Exception("Model load failed")
             mock_registry.instantiate.return_value = mock_adapter
@@ -150,14 +155,15 @@ class TestInitializeUIState:
         """Test that tokenizer loading is attempted."""
         state = UIState()
 
-        with patch('pipeworks.ui.state.model_registry') as mock_registry, \
-             patch('pipeworks.ui.state.TokenizerAnalyzer') as MockTok, \
-             patch('pipeworks.ui.state.PromptBuilder'), \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry") as mock_registry,
+            patch("pipeworks.ui.state.TokenizerAnalyzer") as MockTok,
+            patch("pipeworks.ui.state.PromptBuilder"),
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_registry.instantiate.return_value = Mock()
             mock_tok = Mock()
             MockTok.return_value = mock_tok
@@ -173,14 +179,15 @@ class TestInitializeUIState:
         state.model_adapter = existing_adapter
         state.generator = existing_adapter  # Backward compatibility
 
-        with patch('pipeworks.ui.state.model_registry'), \
-             patch('pipeworks.ui.state.TokenizerAnalyzer') as MockTok, \
-             patch('pipeworks.ui.state.PromptBuilder') as MockPB, \
-             patch('pipeworks.ui.state.GalleryBrowser'), \
-             patch('pipeworks.ui.state.FavoritesDB'), \
-             patch('pipeworks.ui.state.CatalogManager'), \
-             patch('pipeworks.ui.state.config', test_config):
-
+        with (
+            patch("pipeworks.ui.state.model_registry"),
+            patch("pipeworks.ui.state.TokenizerAnalyzer") as MockTok,
+            patch("pipeworks.ui.state.PromptBuilder") as MockPB,
+            patch("pipeworks.ui.state.GalleryBrowser"),
+            patch("pipeworks.ui.state.FavoritesDB"),
+            patch("pipeworks.ui.state.CatalogManager"),
+            patch("pipeworks.ui.state.config", test_config),
+        ):
             mock_tok = Mock()
             mock_pb = Mock()
             MockTok.return_value = mock_tok
@@ -265,16 +272,13 @@ class TestTogglePlugin:
         state.model_adapter = Mock()
         state.generator = state.model_adapter
 
-        with patch('pipeworks.plugins.base.plugin_registry') as mock_registry:
+        with patch("pipeworks.plugins.base.plugin_registry") as mock_registry:
             mock_plugin = Mock(enabled=True)
             mock_registry.instantiate.return_value = mock_plugin
 
             result = toggle_plugin(state, "TestPlugin", True, test_config="value")
 
-            mock_registry.instantiate.assert_called_once_with(
-                "TestPlugin",
-                test_config="value"
-            )
+            mock_registry.instantiate.assert_called_once_with("TestPlugin", test_config="value")
             assert "TestPlugin" in state.active_plugins
             assert state.active_plugins["TestPlugin"] is mock_plugin
 
@@ -308,7 +312,7 @@ class TestTogglePlugin:
         state.model_adapter = Mock()
         state.generator = state.model_adapter
 
-        with patch('pipeworks.plugins.base.plugin_registry') as mock_registry:
+        with patch("pipeworks.plugins.base.plugin_registry") as mock_registry:
             mock_plugin = Mock(enabled=True)
             mock_registry.instantiate.return_value = mock_plugin
 
@@ -323,22 +327,16 @@ class TestTogglePlugin:
         state.model_adapter = Mock()
         state.generator = state.model_adapter
 
-        with patch('pipeworks.plugins.base.plugin_registry') as mock_registry:
+        with patch("pipeworks.plugins.base.plugin_registry") as mock_registry:
             mock_plugin = Mock(enabled=True)
             mock_registry.instantiate.return_value = mock_plugin
 
             result = toggle_plugin(
-                state,
-                "SaveMetadata",
-                True,
-                folder_name="metadata",
-                filename_prefix="test_"
+                state, "SaveMetadata", True, folder_name="metadata", filename_prefix="test_"
             )
 
             mock_registry.instantiate.assert_called_once_with(
-                "SaveMetadata",
-                folder_name="metadata",
-                filename_prefix="test_"
+                "SaveMetadata", folder_name="metadata", filename_prefix="test_"
             )
 
 
