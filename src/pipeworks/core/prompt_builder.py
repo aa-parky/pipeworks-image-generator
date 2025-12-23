@@ -446,7 +446,7 @@ class PromptBuilder:
         selected = random.sample(lines, count)
         return ", ".join(selected)
 
-    def build_prompt(self, segments: list[tuple[str, str]]) -> str:
+    def build_prompt(self, segments: list[tuple[str, str]], delimiter: str = ", ") -> str:
         """Build a prompt from a list of segments.
 
         This is the main orchestration method that combines multiple prompt
@@ -465,6 +465,9 @@ class PromptBuilder:
                      - 'file_range': Line range (format: "filepath|start|end")
                      - 'file_all': All lines from file
                      - 'file_random_multi': N random lines (format: "filepath|count")
+            delimiter: Delimiter for joining segments (default: ", ").
+                      Currently unused - inter-segment joining is hardcoded to ", ".
+                      Added for future extensibility.
 
         Returns:
             Combined prompt string with segments joined by ", "

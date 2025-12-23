@@ -25,6 +25,10 @@ class SegmentConfig:
     dynamic: bool = False
     sequential_start_line: int = 1  # Starting line for Sequential mode
 
+    # Text order and delimiter controls
+    text_order: str = "text_first"  # "text_first" or "file_first"
+    delimiter: str = ", "  # Delimiter for joining text + file content
+
     # Character/Facial condition generation (for Start segments)
     condition_type: str = "None"  # "None", "Character", "Facial", or "Both"
     condition_text: str = ""  # Generated condition text
@@ -214,4 +218,19 @@ CONDITION_TYPES = [
     "Character",  # Generate character conditions (physique, wealth, etc.)
     "Facial",  # Generate facial signal conditions
     "Both",  # Generate both character and facial conditions
+]
+
+# Text order options
+TEXT_ORDER_OPTIONS = [
+    "text_first",  # User text before file/condition content
+    "file_first",  # File/condition content before user text
+]
+
+# Delimiter options for joining text segments
+DELIMITER_OPTIONS = [
+    ", ",  # Comma-space (default, natural for tags/keywords)
+    ". ",  # Period-space (natural for sentences)
+    " ",  # Single space (minimal separation)
+    ".",  # Period only (tight sentence joining)
+    ",",  # Comma only (tight tag joining)
 ]

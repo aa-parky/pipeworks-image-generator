@@ -12,10 +12,11 @@ def convert_segment_values_to_configs(
     """Convert raw UI segment values to SegmentConfig objects.
 
     Args:
-        start_values: 9-tuple of start segment values
-            (text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
-        middle_values: 9-tuple of middle segment values
-        end_values: 9-tuple of end segment values
+        start_values: 11-tuple of start segment values
+            (text, path, file, mode, line, range_end, count, dynamic, sequential_start_line,
+             text_order, delimiter)
+        middle_values: 11-tuple of middle segment values
+        end_values: 11-tuple of end segment values
 
     Returns:
         Tuple of (start_cfg, middle_cfg, end_cfg)
@@ -35,11 +36,12 @@ def split_segment_inputs(values: list) -> tuple[tuple, tuple, tuple, any]:
 
     Returns:
         Tuple of (start_values, middle_values, end_values, state)
-        Each segment values is a 9-tuple
-            (text, path, file, mode, line, range_end, count, dynamic, sequential_start_line)
+        Each segment values is a 11-tuple
+            (text, path, file, mode, line, range_end, count, dynamic, sequential_start_line,
+             text_order, delimiter)
     """
-    start_values = tuple(values[0:9])
-    middle_values = tuple(values[9:18])
-    end_values = tuple(values[18:27])
-    state = values[27]
+    start_values = tuple(values[0:11])
+    middle_values = tuple(values[11:22])
+    end_values = tuple(values[22:33])
+    state = values[33]
     return start_values, middle_values, end_values, state

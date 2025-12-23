@@ -289,7 +289,7 @@ def generate_image(
                 # Create modified Start 2 config with condition prepended
                 original_text = start_2.text
                 if original_text and original_text.strip():
-                    modified_text = f"{new_condition_text}, {original_text}"
+                    modified_text = f"{new_condition_text}{start_2.delimiter}{original_text}"
                 else:
                     modified_text = new_condition_text
 
@@ -307,7 +307,7 @@ def generate_image(
                 # Create modified Start 3 config with condition prepended
                 original_text = start_3.text
                 if original_text and original_text.strip():
-                    modified_text = f"{new_condition_text}, {original_text}"
+                    modified_text = f"{new_condition_text}{start_3.delimiter}{original_text}"
                 else:
                     modified_text = new_condition_text
 

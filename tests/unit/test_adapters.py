@@ -8,9 +8,9 @@ class TestSplitSegmentInputs:
     """Tests for split_segment_inputs function."""
 
     def test_split_valid_28_element_list(self):
-        """Test splitting a valid 28-element input list."""
+        """Test splitting a valid 34-element input list."""
         values = [
-            # Start segment (0-8)
+            # Start segment (0-10)
             "start text",
             "start/path",
             "start.txt",
@@ -20,7 +20,9 @@ class TestSplitSegmentInputs:
             1,
             False,
             1,
-            # Middle segment (9-17)
+            "text_first",
+            ", ",
+            # Middle segment (11-21)
             "middle text",
             "middle/path",
             "middle.txt",
@@ -30,7 +32,9 @@ class TestSplitSegmentInputs:
             3,
             True,
             2,
-            # End segment (18-26)
+            "file_first",
+            " ",
+            # End segment (22-32)
             "end text",
             "end/path",
             "end.txt",
@@ -40,7 +44,9 @@ class TestSplitSegmentInputs:
             5,
             False,
             3,
-            # State (27)
+            "text_first",
+            ", ",
+            # State (33)
             {"key": "value"},
         ]
 
@@ -57,6 +63,8 @@ class TestSplitSegmentInputs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
         )
 
         # Verify middle segment
@@ -70,6 +78,8 @@ class TestSplitSegmentInputs:
             3,
             True,
             2,
+            "file_first",
+            " ",
         )
 
         # Verify end segment
@@ -83,6 +93,8 @@ class TestSplitSegmentInputs:
             5,
             False,
             3,
+            "text_first",
+            ", ",
         )
 
         # Verify state
@@ -101,6 +113,8 @@ class TestSplitSegmentInputs:
             None,
             False,
             None,
+            "text_first",
+            ", ",
             # Middle segment
             "",
             "",
@@ -111,6 +125,8 @@ class TestSplitSegmentInputs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # End segment
             None,
             None,
@@ -121,6 +137,8 @@ class TestSplitSegmentInputs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # State
             None,
         ]
@@ -137,13 +155,13 @@ class TestSplitSegmentInputs:
 
     def test_split_with_empty_strings(self):
         """Test splitting with empty string values."""
-        values = [""] * 27 + [None]
+        values = [""] * 33 + [None]
 
         start_values, middle_values, end_values, state = split_segment_inputs(values)
 
-        assert len(start_values) == 9
-        assert len(middle_values) == 9
-        assert len(end_values) == 9
+        assert len(start_values) == 11
+        assert len(middle_values) == 11
+        assert len(end_values) == 11
         assert all(v == "" for v in start_values)
         assert all(v == "" for v in middle_values)
         assert all(v == "" for v in end_values)
@@ -162,6 +180,8 @@ class TestSplitSegmentInputs:
             5,
             True,
             10,
+            "text_first",
+            ", ",
             # Middle segment
             "text",
             "path",
@@ -172,6 +192,8 @@ class TestSplitSegmentInputs:
             0,
             False,
             0,
+            "text_first",
+            ", ",
             # End segment
             "text",
             "path",
@@ -182,6 +204,8 @@ class TestSplitSegmentInputs:
             10,
             True,
             500,
+            "text_first",
+            ", ",
             # State
             {"count": 123},
         ]
@@ -198,7 +222,7 @@ class TestSplitSegmentInputs:
 
     def test_split_returns_tuples(self):
         """Test that segment values are returned as tuples, not lists."""
-        values = ["value"] * 27 + [None]
+        values = ["value"] * 33 + [None]
 
         start_values, middle_values, end_values, state = split_segment_inputs(values)
 
@@ -219,6 +243,8 @@ class TestSplitSegmentInputs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # Middle - True for dynamic
             "text",
             "path",
@@ -229,6 +255,8 @@ class TestSplitSegmentInputs:
             1,
             True,
             1,
+            "text_first",
+            ", ",
             # End - False for dynamic
             "text",
             "path",
@@ -239,6 +267,8 @@ class TestSplitSegmentInputs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # State
             None,
         ]
@@ -265,6 +295,8 @@ class TestConvertSegmentValuesToConfigs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
         )
         middle_values = (
             "middle text",
@@ -276,6 +308,8 @@ class TestConvertSegmentValuesToConfigs:
             3,
             True,
             2,
+            "file_first",
+            " ",
         )
         end_values = (
             "end text",
@@ -287,6 +321,8 @@ class TestConvertSegmentValuesToConfigs:
             5,
             False,
             3,
+            "text_first",
+            ", ",
         )
 
         start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(
@@ -304,6 +340,8 @@ class TestConvertSegmentValuesToConfigs:
         assert start_cfg.count == 1
         assert start_cfg.dynamic is False
         assert start_cfg.sequential_start_line == 1
+        assert start_cfg.text_order == "text_first"
+        assert start_cfg.delimiter == ", "
 
         # Verify middle config
         assert isinstance(middle_cfg, SegmentConfig)
@@ -316,6 +354,8 @@ class TestConvertSegmentValuesToConfigs:
         assert middle_cfg.count == 3
         assert middle_cfg.dynamic is True
         assert middle_cfg.sequential_start_line == 2
+        assert middle_cfg.text_order == "file_first"
+        assert middle_cfg.delimiter == " "
 
         # Verify end config
         assert isinstance(end_cfg, SegmentConfig)
@@ -328,6 +368,8 @@ class TestConvertSegmentValuesToConfigs:
         assert end_cfg.count == 5
         assert end_cfg.dynamic is False
         assert end_cfg.sequential_start_line == 3
+        assert end_cfg.text_order == "text_first"
+        assert end_cfg.delimiter == ", "
 
     def test_convert_with_none_values(self):
         """Test conversion handles None values correctly."""
@@ -341,6 +383,8 @@ class TestConvertSegmentValuesToConfigs:
             None,
             False,
             None,
+            "text_first",
+            ", ",
         )
         middle_values = (
             "",
@@ -352,6 +396,8 @@ class TestConvertSegmentValuesToConfigs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
         )
         end_values = (
             None,
@@ -363,6 +409,8 @@ class TestConvertSegmentValuesToConfigs:
             1,
             False,
             1,
+            "text_first",
+            ", ",
         )
 
         start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(
@@ -387,7 +435,7 @@ class TestConvertSegmentValuesToConfigs:
         ]
 
         for mode in modes:
-            values = ("text", "path", "file.txt", mode, 1, 10, 5, True, 1)
+            values = ("text", "path", "file.txt", mode, 1, 10, 5, True, 1, "text_first", ", ")
             start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(
                 values, values, values
             )
@@ -399,14 +447,38 @@ class TestConvertSegmentValuesToConfigs:
     def test_convert_preserves_dynamic_flag(self):
         """Test conversion preserves dynamic checkbox state."""
         # Dynamic = True
-        values_dynamic = ("text", "path", "file.txt", "Random Line", 1, 1, 1, True, 1)
+        values_dynamic = (
+            "text",
+            "path",
+            "file.txt",
+            "Random Line",
+            1,
+            1,
+            1,
+            True,
+            1,
+            "text_first",
+            ", ",
+        )
         start_cfg, _, _ = convert_segment_values_to_configs(
             values_dynamic, values_dynamic, values_dynamic
         )
         assert start_cfg.dynamic is True
 
         # Dynamic = False
-        values_static = ("text", "path", "file.txt", "Random Line", 1, 1, 1, False, 1)
+        values_static = (
+            "text",
+            "path",
+            "file.txt",
+            "Random Line",
+            1,
+            1,
+            1,
+            False,
+            1,
+            "text_first",
+            ", ",
+        )
         start_cfg, _, _ = convert_segment_values_to_configs(
             values_static, values_static, values_static
         )
@@ -414,7 +486,19 @@ class TestConvertSegmentValuesToConfigs:
 
     def test_convert_with_large_numeric_values(self):
         """Test conversion with large line numbers and counts."""
-        values = ("text", "path", "file.txt", "Line Range", 9999, 10000, 10, False, 5000)
+        values = (
+            "text",
+            "path",
+            "file.txt",
+            "Line Range",
+            9999,
+            10000,
+            10,
+            False,
+            5000,
+            "text_first",
+            ", ",
+        )
 
         start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(values, values, values)
 
@@ -425,7 +509,7 @@ class TestConvertSegmentValuesToConfigs:
 
     def test_convert_returns_tuple_of_three(self):
         """Test that conversion returns exactly three SegmentConfig objects."""
-        values = ("text", "path", "file.txt", "Random Line", 1, 1, 1, False, 1)
+        values = ("text", "path", "file.txt", "Random Line", 1, 1, 1, False, 1, "text_first", ", ")
 
         result = convert_segment_values_to_configs(values, values, values)
 
@@ -435,7 +519,7 @@ class TestConvertSegmentValuesToConfigs:
 
     def test_convert_with_empty_strings(self):
         """Test conversion with empty string values."""
-        values = ("", "", "", "Random Line", 1, 1, 1, False, 1)
+        values = ("", "", "", "Random Line", 1, 1, 1, False, 1, "text_first", ", ")
 
         start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(values, values, values)
 
@@ -447,9 +531,33 @@ class TestConvertSegmentValuesToConfigs:
 
     def test_convert_segments_are_independent(self):
         """Test that each segment is converted independently."""
-        start_values = ("START", "start/", "start.txt", "Random Line", 1, 2, 3, False, 1)
-        middle_values = ("MIDDLE", "mid/", "mid.txt", "Specific Line", 4, 5, 6, True, 2)
-        end_values = ("END", "end/", "end.txt", "Line Range", 7, 8, 9, False, 3)
+        start_values = (
+            "START",
+            "start/",
+            "start.txt",
+            "Random Line",
+            1,
+            2,
+            3,
+            False,
+            1,
+            "text_first",
+            ", ",
+        )
+        middle_values = (
+            "MIDDLE",
+            "mid/",
+            "mid.txt",
+            "Specific Line",
+            4,
+            5,
+            6,
+            True,
+            2,
+            "file_first",
+            " ",
+        )
+        end_values = ("END", "end/", "end.txt", "Line Range", 7, 8, 9, False, 3, "text_first", ", ")
 
         start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(
             start_values, middle_values, end_values
@@ -480,7 +588,7 @@ class TestSplitAndConvertIntegration:
         """Test the full pipeline from UI values list to SegmentConfig objects."""
         # Simulate UI output values
         ui_values = [
-            # Start segment (0-8)
+            # Start segment (0-10)
             "A fantasy landscape",
             "",
             "landscapes.txt",
@@ -490,7 +598,9 @@ class TestSplitAndConvertIntegration:
             1,
             False,
             1,
-            # Middle segment (9-17)
+            "text_first",
+            ", ",
+            # Middle segment (11-21)
             "with vibrant colors",
             "subfolder",
             "colors.txt",
@@ -500,7 +610,9 @@ class TestSplitAndConvertIntegration:
             3,
             True,
             1,
-            # End segment (18-26)
+            "file_first",
+            " ",
+            # End segment (22-32)
             "at sunset",
             "",
             "times.txt",
@@ -510,7 +622,9 @@ class TestSplitAndConvertIntegration:
             1,
             False,
             1,
-            # State (27)
+            "text_first",
+            ", ",
+            # State (33)
             {"initialized": True},
         ]
 
@@ -545,7 +659,7 @@ class TestSplitAndConvertIntegration:
 
     def test_pipeline_with_minimal_values(self):
         """Test pipeline with minimal/default values."""
-        ui_values = [""] * 9 + [""] * 9 + [""] * 9 + [None]
+        ui_values = [""] * 11 + [""] * 11 + [""] * 11 + [None]
 
         start_values, middle_values, end_values, state = split_segment_inputs(ui_values)
         start_cfg, middle_cfg, end_cfg = convert_segment_values_to_configs(
@@ -571,6 +685,8 @@ class TestSplitAndConvertIntegration:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # Middle segment - not configured (None)
             "",
             "",
@@ -581,6 +697,8 @@ class TestSplitAndConvertIntegration:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # End segment - not configured (folder)
             "",
             "",
@@ -591,6 +709,8 @@ class TestSplitAndConvertIntegration:
             1,
             False,
             1,
+            "text_first",
+            ", ",
             # State
             None,
         ]

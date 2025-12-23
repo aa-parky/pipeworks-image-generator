@@ -49,8 +49,9 @@ class TestSegmentUI:
             segment = SegmentUI("Test", ["(None)"])
             inputs = segment.get_input_components()
 
-            # text, path_state, file, mode, line, range_end, count, dynamic, sequential_start_line
-            assert len(inputs) == 9
+            # text, path_state, file, mode, line, range_end, count, dynamic, sequential_start_line,
+            # text_order, delimiter
+            assert len(inputs) == 11
 
     def test_get_output_components(self):
         """Test that get_output_components returns correct components."""
@@ -120,6 +121,8 @@ class TestSegmentUI:
             3,
             True,
             2,  # sequential_start_line
+            "file_first",  # text_order
+            ". ",  # delimiter
         )
 
         assert isinstance(config, SegmentConfig)
@@ -132,6 +135,8 @@ class TestSegmentUI:
         assert config.count == 3
         assert config.dynamic is True
         assert config.sequential_start_line == 2
+        assert config.text_order == "file_first"
+        assert config.delimiter == ". "
 
     def test_values_to_config_handles_none_numbers(self):
         """Test that values_to_config handles None number values."""
@@ -145,12 +150,16 @@ class TestSegmentUI:
             None,  # count
             False,
             None,  # sequential_start_line
+            "text_first",  # text_order
+            ", ",  # delimiter
         )
 
         assert config.line == 1  # Default
         assert config.range_end == 1  # Default
         assert config.count == 1  # Default
         assert config.sequential_start_line == 1  # Default
+        assert config.text_order == "text_first"
+        assert config.delimiter == ", "
 
     def test_format_title_unconfigured(self):
         """Test format_title for unconfigured segment."""

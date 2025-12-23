@@ -127,13 +127,32 @@ def build_combined_prompt(
 
     # Helper to add segment
     def add_segment(segment: SegmentConfig):
-        # Add user text if provided
-        if segment.text and segment.text.strip():
-            segments.append(("text", segment.text.strip()))
+        """Add a segment to the prompt, respecting text_order and delimiter.
 
-        # Add file selection if configured
-        if segment.is_configured():
-            # Get full file path
+        Handles four scenarios:
+        1. No content: Skip
+        2. Only text: Add text directly
+        3. Only file: Add file as lazy tuple (unchanged from current)
+        4. Both text and file: Resolve file content early, combine with text using
+           delimiter and text_order, add as single text segment
+
+        Args:
+            segment: SegmentConfig with text, file, and settings
+        """
+        has_text = segment.text and segment.text.strip()
+        has_file = segment.is_configured()
+
+        # Case 1: No content - skip
+        if not has_text and not has_file:
+            return
+
+        # Case 2: Only text - add directly
+        if has_text and not has_file:
+            segments.append(("text", segment.text.strip()))
+            return
+
+        # Case 3: Only file - add as lazy tuple (unchanged from current)
+        if has_file and not has_text:
             full_path = state.prompt_builder.get_full_path(segment.path, segment.file)
 
             if segment.mode == "Random Line":
@@ -148,11 +167,46 @@ def build_combined_prompt(
                 segments.append(("file_random_multi", f"{full_path}|{segment.count}"))
             elif segment.mode == "Sequential":
                 segments.append(
-                    (
-                        "file_sequential",
-                        f"{full_path}|{segment.sequential_start_line}|{run_index}",
-                    )
+                    ("file_sequential", f"{full_path}|{segment.sequential_start_line}|{run_index}")
                 )
+            return
+
+        # Case 4: Both text and file - resolve file early and combine
+        if has_text and has_file:
+            full_path = state.prompt_builder.get_full_path(segment.path, segment.file)
+
+            # Resolve file content based on mode
+            file_content = ""
+            if segment.mode == "Random Line":
+                file_content = state.prompt_builder.get_random_line(full_path)
+            elif segment.mode == "Specific Line":
+                file_content = state.prompt_builder.get_specific_line(full_path, segment.line)
+            elif segment.mode == "Line Range":
+                file_content = state.prompt_builder.get_line_range(
+                    full_path, segment.line, segment.range_end
+                )
+            elif segment.mode == "All Lines":
+                file_content = state.prompt_builder.get_all_lines(full_path)
+            elif segment.mode == "Random Multiple":
+                file_content = state.prompt_builder.get_random_lines(full_path, segment.count)
+            elif segment.mode == "Sequential":
+                file_content = state.prompt_builder.get_sequential_line(
+                    full_path, segment.sequential_start_line, run_index
+                )
+
+            # If file read failed, fall back to text only
+            if not file_content:
+                segments.append(("text", segment.text.strip()))
+                return
+
+            # Combine text and file based on text_order
+            if segment.text_order == "text_first":
+                combined = f"{segment.text.strip()}{segment.delimiter}{file_content}"
+            else:  # file_first
+                combined = f"{file_content}{segment.delimiter}{segment.text.strip()}"
+
+            # Add as single text segment
+            segments.append(("text", combined))
 
     # Add segments in order (Start 1-3, Mid 1-3, End 1-3)
     add_segment(start_1)

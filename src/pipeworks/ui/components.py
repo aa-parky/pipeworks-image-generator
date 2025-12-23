@@ -2,7 +2,13 @@
 
 import gradio as gr
 
-from .models import CONDITION_TYPES, SEGMENT_MODES, SegmentConfig
+from .models import (
+    CONDITION_TYPES,
+    DELIMITER_OPTIONS,
+    SEGMENT_MODES,
+    TEXT_ORDER_OPTIONS,
+    SegmentConfig,
+)
 
 
 class SegmentUI:
@@ -55,6 +61,21 @@ class SegmentUI:
                     label="Dynamic", value=False, info="Rebuild this segment for each image"
                 )
 
+            # Text order and delimiter controls
+            with gr.Row():
+                self.text_order = gr.Radio(
+                    label="Text Order",
+                    choices=TEXT_ORDER_OPTIONS,
+                    value="text_first",
+                    info="Text before or after file content",
+                )
+                self.delimiter = gr.Dropdown(
+                    label="Delimiter",
+                    choices=DELIMITER_OPTIONS,
+                    value=", ",
+                    info="How to join text and file",
+                )
+
             # Mode-specific inputs (visibility controlled by mode selection)
             with gr.Row():
                 self.line = gr.Number(
@@ -89,6 +110,8 @@ class SegmentUI:
             self.path_state,
             self.mode,
             self.dynamic,
+            self.text_order,
+            self.delimiter,
             self.line,
             self.range_end,
             self.count,
@@ -111,6 +134,8 @@ class SegmentUI:
             self.count,
             self.dynamic,
             self.sequential_start_line,
+            self.text_order,
+            self.delimiter,
         ]
 
     def get_output_components(self) -> list[gr.components.Component]:
@@ -150,6 +175,8 @@ class SegmentUI:
         count: int,
         dynamic: bool,
         sequential_start_line: int,
+        text_order: str,
+        delimiter: str,
     ) -> SegmentConfig:
         """Convert UI component values to SegmentConfig dataclass.
 
@@ -163,6 +190,8 @@ class SegmentUI:
             count: Count input
             dynamic: Dynamic checkbox state
             sequential_start_line: Starting line for Sequential mode
+            text_order: Order of text vs file content ("text_first" or "file_first")
+            delimiter: Delimiter for joining text and file content
 
         Returns:
             SegmentConfig instance with all values
@@ -177,6 +206,8 @@ class SegmentUI:
             count=int(count) if count else 1,
             dynamic=dynamic,
             sequential_start_line=int(sequential_start_line) if sequential_start_line else 1,
+            text_order=text_order,
+            delimiter=delimiter,
         )
 
     @staticmethod
@@ -330,6 +361,21 @@ class ConditionSegmentUI(SegmentUI):
                 self.mode = gr.Dropdown(label="Mode", choices=SEGMENT_MODES, value="Random Line")
                 self.dynamic = gr.Checkbox(
                     label="Dynamic", value=False, info="Rebuild this segment for each image"
+                )
+
+            # Text order and delimiter controls
+            with gr.Row():
+                self.text_order = gr.Radio(
+                    label="Text Order",
+                    choices=TEXT_ORDER_OPTIONS,
+                    value="text_first",
+                    info="Text before or after file content",
+                )
+                self.delimiter = gr.Dropdown(
+                    label="Delimiter",
+                    choices=DELIMITER_OPTIONS,
+                    value=", ",
+                    info="How to join text and file",
                 )
 
             # Mode-specific inputs (visibility controlled by mode selection)

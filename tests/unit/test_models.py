@@ -5,7 +5,9 @@ import pytest
 from pipeworks.ui.models import (
     ASPECT_RATIOS,
     DEFAULT_SEED,
+    DELIMITER_OPTIONS,
     MAX_SEED,
+    TEXT_ORDER_OPTIONS,
     GenerationParams,
     SegmentConfig,
     UIState,
@@ -94,6 +96,32 @@ class TestSegmentConfig:
         """Test has_content returns False with whitespace-only text."""
         segment = SegmentConfig(text="   \n\t  ")
         assert segment.has_content() is False
+
+    def test_text_order_default_value(self):
+        """Test text_order has correct default value."""
+        segment = SegmentConfig()
+        assert segment.text_order == "text_first"
+
+    def test_delimiter_default_value(self):
+        """Test delimiter has correct default value."""
+        segment = SegmentConfig()
+        assert segment.delimiter == ", "
+
+    def test_custom_text_order_and_delimiter(self):
+        """Test custom text_order and delimiter values can be set."""
+        segment = SegmentConfig(text_order="file_first", delimiter=". ")
+        assert segment.text_order == "file_first"
+        assert segment.delimiter == ". "
+
+    def test_backward_compatibility_with_new_fields(self):
+        """Test that existing methods still work with new fields."""
+        # Test has_content() with new fields
+        segment = SegmentConfig(text="test", text_order="file_first", delimiter=". ")
+        assert segment.has_content() is True
+
+        # Test is_configured() with new fields
+        segment2 = SegmentConfig(file="test.txt", text_order="file_first", delimiter=". ")
+        assert segment2.is_configured() is True
 
 
 class TestGenerationParams:
@@ -479,3 +507,20 @@ class TestConstants:
         assert DEFAULT_SEED == 42
         assert DEFAULT_SEED >= 0
         assert DEFAULT_SEED <= MAX_SEED
+
+    def test_text_order_options(self):
+        """Test TEXT_ORDER_OPTIONS contains expected values."""
+        assert isinstance(TEXT_ORDER_OPTIONS, list)
+        assert len(TEXT_ORDER_OPTIONS) == 2
+        assert "text_first" in TEXT_ORDER_OPTIONS
+        assert "file_first" in TEXT_ORDER_OPTIONS
+
+    def test_delimiter_options(self):
+        """Test DELIMITER_OPTIONS contains expected values."""
+        assert isinstance(DELIMITER_OPTIONS, list)
+        assert len(DELIMITER_OPTIONS) == 5
+        assert ", " in DELIMITER_OPTIONS  # Default
+        assert ". " in DELIMITER_OPTIONS
+        assert " " in DELIMITER_OPTIONS
+        assert "." in DELIMITER_OPTIONS
+        assert "," in DELIMITER_OPTIONS
