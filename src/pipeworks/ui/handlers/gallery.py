@@ -148,6 +148,9 @@ def refresh_gallery(current_path: str, state: UIState) -> tuple[list[str], UISta
         images = state.gallery_browser.scan_images(current_path)
         state.gallery_images = images
 
+        # Reset selected index to prevent stale state after refresh
+        state.gallery_selected_index = None
+
         return images, state
 
     except Exception as e:

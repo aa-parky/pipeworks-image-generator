@@ -969,6 +969,10 @@ def create_gallery_tab(ui_state):
         fn=refresh_gallery,
         inputs=[current_path_state, ui_state],
         outputs=[gallery, ui_state],
+    ).then(
+        # Clear metadata display after refresh to indicate reselection needed
+        lambda: "*Select an image to view metadata*",
+        outputs=[metadata_display],
     )
 
     # Return components for initialization event handler
