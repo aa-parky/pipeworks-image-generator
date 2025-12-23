@@ -68,7 +68,6 @@ def initialize_ui_state(state: UIState | None = None, model_name: str | None = N
                 logger.error(f"Failed to pre-load model: {e}")
                 logger.warning("Model will be loaded on first generation attempt")
 
-
         # Initialize tokenizer analyzer
         if state.tokenizer_analyzer is None:
             logger.info("Initializing TokenizerAnalyzer")
