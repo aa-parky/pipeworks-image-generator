@@ -211,10 +211,11 @@ def create_generation_tab(ui_state):
                 # Row 1: Start segments
                 gr.Markdown("**Start Segments**")
                 with gr.Row():
-                    # Start 1 has character condition generation support
-                    start_1 = ConditionSegmentUI("Start 1", initial_choices)
-                    start_2 = SegmentUI("Start 2", initial_choices)
-                    start_3 = SegmentUI("Start 3", initial_choices)
+                    # Start 1 is a regular segment (no conditions)
+                    start_1 = SegmentUI("Start 1", initial_choices)
+                    # Start 2 and Start 3 have condition generation support
+                    start_2 = ConditionSegmentUI("Start 2", initial_choices)
+                    start_3 = ConditionSegmentUI("Start 3", initial_choices)
 
                 # Row 2: Mid segments
                 gr.Markdown("**Mid Segments**")
