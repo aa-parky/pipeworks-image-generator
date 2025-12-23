@@ -37,3 +37,14 @@ repos:
       - id: trailing-whitespace
       # Ensure files end with newline
       - id: end-of-file-fixer
+
+  # Run tests before commit (prevents committing broken code)
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest
+        entry: pytest
+        args: [tests/unit/, -m, "not slow", --tb=short]
+        language: system
+        pass_filenames: false
+        always_run: true
