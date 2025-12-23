@@ -393,7 +393,7 @@ class TestUIState:
         """Test that UIState initializes with None values."""
         state = UIState()
 
-        assert state.generator is None
+        assert state.model_adapter is None
         assert state.tokenizer_analyzer is None
         assert state.prompt_builder is None
         assert state.active_plugins == {}
@@ -406,7 +406,7 @@ class TestUIState:
     def test_is_initialized_false_partial(self):
         """Test is_initialized returns False when partially initialized."""
         state = UIState()
-        state.generator = "mock_generator"
+        state.model_adapter = "mock_adapter"
         assert state.is_initialized() is False
 
         state.tokenizer_analyzer = "mock_tokenizer"
@@ -416,7 +416,6 @@ class TestUIState:
         """Test is_initialized returns True when fully initialized."""
         state = UIState()
         state.model_adapter = "mock_adapter"
-        state.generator = state.model_adapter  # Backward compatibility
         state.tokenizer_analyzer = "mock_tokenizer"
         state.prompt_builder = "mock_prompt_builder"
 

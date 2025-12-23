@@ -62,7 +62,6 @@ class TestInitializeUIState:
             result = initialize_ui_state(state)
 
             assert result.model_adapter is mock_adapter
-            assert result.generator is mock_adapter  # Backward compatibility alias
             mock_registry.instantiate.assert_called_once()
 
     def test_initialize_creates_tokenizer(self, test_config):
@@ -146,7 +145,6 @@ class TestInitializeUIState:
             result = initialize_ui_state(state)
 
             assert result.model_adapter is mock_adapter
-            assert result.generator is mock_adapter
 
     def test_initialize_loads_tokenizer(self, test_config):
         """Test that tokenizer loading is attempted."""
