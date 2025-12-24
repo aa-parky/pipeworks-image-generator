@@ -409,7 +409,8 @@ class TestApplyGalleryFilter:
         initialized_state.favorites_db.add_favorite(image1_path)
 
         # Apply filter
-        filtered_images, state = apply_gallery_filter("Favorites Only", "", initialized_state)
+        gallery_update, state = apply_gallery_filter("Favorites Only", "", initialized_state)
+        filtered_images = gallery_update["value"]
 
         assert len(filtered_images) == 1
         assert image1_path in filtered_images
@@ -417,7 +418,8 @@ class TestApplyGalleryFilter:
 
     def test_filter_to_all_images(self, initialized_state):
         """Test filtering to show all images."""
-        filtered_images, state = apply_gallery_filter("All Images", "", initialized_state)
+        gallery_update, state = apply_gallery_filter("All Images", "", initialized_state)
+        filtered_images = gallery_update["value"]
 
         assert len(filtered_images) == 3
         assert state.gallery_filter == "all"
@@ -426,7 +428,7 @@ class TestApplyGalleryFilter:
         """Test that filtering preserves other state."""
         initialized_state.gallery_selected_index = 1
 
-        _, state = apply_gallery_filter("All Images", "", initialized_state)
+        gallery_update, state = apply_gallery_filter("All Images", "", initialized_state)
 
         # Selected index should be preserved
         assert state.gallery_selected_index == 1
@@ -556,6 +558,7 @@ class TestGalleryHandlerIntegration:
         state.favorites_db.add_favorite(str(new_image))
 
         # Filter to favorites
-        filtered, state = apply_gallery_filter("Favorites Only", "", state)
+        gallery_update, state = apply_gallery_filter("Favorites Only", "", state)
+        filtered = gallery_update["value"]
         assert len(filtered) == 1
         assert str(new_image) in filtered[0]

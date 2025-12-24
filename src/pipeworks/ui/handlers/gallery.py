@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def load_gallery_folder(
     selected_item: str, current_path: str, state: UIState
-) -> tuple[dict[str, Any], str, list[str], UIState]:
+) -> tuple[dict[str, Any], str, dict[str, Any], UIState]:
     """Navigate folders or load images from current path.
 
     Args:
@@ -23,7 +23,7 @@ def load_gallery_folder(
         state: UI state
 
     Returns:
-        Tuple of (dropdown_update, new_path, gallery_images, updated_state)
+        Tuple of (dropdown_update, new_path, gallery_update, updated_state)
     """
     try:
         # Initialize state if needed
@@ -31,7 +31,7 @@ def load_gallery_folder(
 
         # Check if gallery_browser is available
         if state.gallery_browser is None:
-            return gr.update(), current_path, state.gallery_images, state
+            return gr.update(), current_path, gr.update(), state
 
         # Handle folder navigation
         if selected_item and selected_item.startswith("📁"):
@@ -39,7 +39,7 @@ def load_gallery_folder(
 
             # Skip if it's just a placeholder
             if not folder_name or folder_name in ["(No folders)", "(Error)", "- Select folder --"]:
-                return gr.update(), current_path, state.gallery_images, state
+                return gr.update(), current_path, gr.update(), state
 
             if folder_name == "..":
                 # Go up one level
@@ -74,15 +74,20 @@ def load_gallery_folder(
 
             # Update dropdown with new choices and set to neutral selection
             logger.info(f"Navigated to: {new_path}, {len(images)} images, {len(folders)} folders")
-            return gr.update(choices=choices, value="-- Select folder --"), new_path, images, state
+            return (
+                gr.update(choices=choices, value="-- Select folder --"),
+                new_path,
+                gr.update(value=images),
+                state,
+            )
 
         else:
             # Not a folder selection, just return current state
-            return gr.update(), current_path, state.gallery_images, state
+            return gr.update(), current_path, gr.update(), state
 
     except Exception as e:
         logger.error(f"Error loading gallery folder: {e}", exc_info=True)
-        return gr.update(), current_path, state.gallery_images, state
+        return gr.update(), current_path, gr.update(), state
 
 
 def select_gallery_image(
@@ -344,7 +349,7 @@ def toggle_favorite(state: UIState) -> tuple[str, str, UIState]:
 
 def apply_gallery_filter(
     filter_mode: str, current_path: str, state: UIState
-) -> tuple[list[str], UIState]:
+) -> tuple[dict[str, Any], UIState]:
     """Filter gallery by favorites.
 
     Args:
@@ -353,7 +358,7 @@ def apply_gallery_filter(
         state: UI state
 
     Returns:
-        Tuple of (filtered_images, updated_state)
+        Tuple of (gallery_update, updated_state)
     """
     try:
         # Initialize state if needed
@@ -361,7 +366,7 @@ def apply_gallery_filter(
 
         # Check if required components are available
         if state.gallery_browser is None or state.favorites_db is None:
-            return [], state
+            return gr.update(), state
 
         # Get all images in current path
         all_images = state.gallery_browser.scan_images(current_path)
@@ -381,21 +386,21 @@ def apply_gallery_filter(
         # Update cached images
         state.gallery_images = filtered_images
 
-        return filtered_images, state
+        return gr.update(value=filtered_images), state
 
     except Exception as e:
         logger.error(f"Error applying gallery filter: {e}", exc_info=True)
-        return [], state
+        return gr.update(), state
 
 
-def move_favorites_to_catalog(state: UIState) -> tuple[str, list[str], UIState]:
+def move_favorites_to_catalog(state: UIState) -> tuple[str, dict[str, Any], UIState]:
     """Move all favorited images to catalog.
 
     Args:
         state: UI state
 
     Returns:
-        Tuple of (info_message, refreshed_gallery_images, updated_state)
+        Tuple of (info_message, gallery_update, updated_state)
     """
     try:
         # Initialize state if needed
@@ -407,13 +412,13 @@ def move_favorites_to_catalog(state: UIState) -> tuple[str, list[str], UIState]:
             or state.catalog_manager is None
             or state.gallery_browser is None
         ):
-            return "*Error: Required components not initialized*", state.gallery_images, state
+            return "*Error: Required components not initialized*", gr.update(), state
 
         # Get count before move
         favorite_count = state.favorites_db.get_favorite_count()
 
         if favorite_count == 0:
-            return "*No favorites to move*", state.gallery_images, state
+            return "*No favorites to move*", gr.update(), state
 
         # Perform move operation
         logger.info(f"Starting move of {favorite_count} favorites to catalog")
@@ -446,16 +451,16 @@ def move_favorites_to_catalog(state: UIState) -> tuple[str, list[str], UIState]:
         state.gallery_images = refreshed_images
 
         logger.info(f"Move complete: {stats}")
-        return msg, refreshed_images, state
+        return msg, gr.update(value=refreshed_images), state
 
     except Exception as e:
         logger.error(f"Error moving favorites to catalog: {e}", exc_info=True)
-        return f"*Error: {str(e)}*", state.gallery_images, state
+        return f"*Error: {str(e)}*", gr.update(), state
 
 
 def switch_gallery_root(
     root_choice: str, state: UIState
-) -> tuple[dict[str, Any], str, list[str], UIState]:
+) -> tuple[dict[str, Any], str, dict[str, Any], UIState]:
     """Switch between outputs and catalog browsing.
 
     Args:
@@ -463,7 +468,7 @@ def switch_gallery_root(
         state: UI state
 
     Returns:
-        Tuple of (dropdown_update, current_path, gallery_images, updated_state)
+        Tuple of (dropdown_update, current_path, gallery_update, updated_state)
     """
     try:
         # Initialize state if needed
@@ -471,7 +476,7 @@ def switch_gallery_root(
 
         # Check if gallery_browser is available
         if state.gallery_browser is None:
-            return gr.update(), state.gallery_current_path, state.gallery_images, state
+            return gr.update(), state.gallery_current_path, gr.update(), state
 
         # Extract root name (remove emoji prefix)
         root_name = root_choice.replace("📁 ", "").strip()
@@ -497,8 +502,13 @@ def switch_gallery_root(
         state.gallery_images = images
 
         logger.info(f"Switched to {root_name} root: {len(images)} images, {len(folders)} folders")
-        return gr.update(choices=choices, value="-- Select folder --"), current_path, images, state
+        return (
+            gr.update(choices=choices, value="-- Select folder --"),
+            current_path,
+            gr.update(value=images),
+            state,
+        )
 
     except Exception as e:
         logger.error(f"Error switching gallery root: {e}", exc_info=True)
-        return gr.update(), state.gallery_current_path, state.gallery_images, state
+        return gr.update(), state.gallery_current_path, gr.update(), state
