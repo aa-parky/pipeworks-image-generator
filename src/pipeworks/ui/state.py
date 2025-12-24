@@ -63,9 +63,24 @@ def initialize_ui_state(state: UIState | None = None, model_name: str | None = N
                 state.current_model_name, config, plugins=[]
             )
             state.generator = state.model_adapter  # type: ignore[attr-defined]  # Backward compatibility
+
             # Pre-load model (skip in offline mode)
             if os.environ.get("HF_HUB_OFFLINE") != "1":
                 try:
+                    # Force GC and clear CUDA cache to prevent OOM on browser refresh
+                    # Browser refresh creates new State but old model may still be in memory
+                    import gc
+
+                    import torch
+
+                    if torch.cuda.is_available():
+                        gc.collect()  # Force Python garbage collection to clean up old models
+                        torch.cuda.empty_cache()  # Clear CUDA memory cache
+                        torch.cuda.synchronize()  # Wait for all CUDA operations to complete
+                        logger.info(
+                            "Cleared CUDA cache and ran garbage collection before model load"
+                        )
+
                     state.model_adapter.load_model()
                     logger.info("Model pre-loaded successfully")
                 except Exception as e:
