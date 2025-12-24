@@ -2,6 +2,7 @@
 
 import logging
 import random
+from typing import Any
 
 import gradio as gr
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def switch_model_handler(
     model_name: str, state: UIState
-) -> tuple[str, gr.update, gr.update, UIState]:
+) -> tuple[str, dict[str, Any], dict[str, Any], UIState]:
     """Handle model switching from the UI.
 
     Args:
@@ -114,7 +115,7 @@ def get_available_models() -> list[str]:
     return model_registry.list_available()
 
 
-def set_aspect_ratio(ratio_name: str) -> tuple[gr.Number, gr.Number]:
+def set_aspect_ratio(ratio_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Set width and height based on aspect ratio preset.
 
     Args:
@@ -205,6 +206,10 @@ def generate_image(
         # Initialize state
         state = initialize_ui_state(state)
 
+        # Check if model_adapter is available
+        if state.model_adapter is None:
+            return [], "❌ **Error**: Model adapter not initialized", str(seed), state
+
         # Determine if this is image editing or text-to-image
         is_image_edit = state.model_adapter.model_type == "image-edit"
 
@@ -268,7 +273,7 @@ def generate_image(
 
         # Loop through runs
         for run in range(runs):
-            logger.info(f"Starting run {run+1}/{runs}")
+            logger.info(f"Starting run {run + 1}/{runs}")
 
             # Regenerate conditions per-run if dynamic is enabled
             from dataclasses import replace
@@ -283,7 +288,7 @@ def generate_image(
                 # Generate new condition for this run (using random seed)
                 new_condition_text = generate_condition_by_type(condition_type_2, seed=None)
                 logger.info(
-                    f"Generated dynamic condition for Start 2 run {run+1}: {new_condition_text}"
+                    f"Generated dynamic condition for Start 2 run {run + 1}: {new_condition_text}"
                 )
 
                 # Create modified Start 2 config with condition prepended
@@ -301,7 +306,7 @@ def generate_image(
                 # Generate new condition for this run (using random seed)
                 new_condition_text = generate_condition_by_type(condition_type_3, seed=None)
                 logger.info(
-                    f"Generated dynamic condition for Start 3 run {run+1}: {new_condition_text}"
+                    f"Generated dynamic condition for Start 3 run {run + 1}: {new_condition_text}"
                 )
 
                 # Create modified Start 3 config with condition prepended
@@ -365,6 +370,9 @@ def generate_image(
                 # Generate and save image based on model type
                 if is_image_edit:
                     # Image editing workflow - load all input images
+                    if input_images is None:
+                        logger.error("Input images is None in image edit mode")
+                        continue
                     loaded_images = [Image.open(img_path) for img_path in input_images]
 
                     # For multi-image, pass as list; for single image, can pass as single or list
@@ -400,7 +408,10 @@ def generate_image(
                 logger.info(f"Image {image_num}/{params.total_images} complete: {save_path}")
 
         # Create info text
-        active_plugin_names = [p.name for p in state.model_adapter.plugins if p.enabled]
+        if state.model_adapter is None or state.model_adapter.plugins is None:
+            active_plugin_names = []
+        else:
+            active_plugin_names = [p.name for p in state.model_adapter.plugins if p.enabled]
         plugins_info = (
             f"\n**Active Plugins:** {', '.join(active_plugin_names)}" if active_plugin_names else ""
         )
@@ -436,12 +447,14 @@ def generate_image(
         # Create info text based on model type
         if is_image_edit:
             # Format input images display
-            if len(input_images) == 1:
+            if input_images is None or len(input_images) == 0:
+                images_display = "**Input Image:** (unknown)"
+            elif len(input_images) == 1:
                 images_display = f"**Input Image:** {Path(input_images[0]).name}"
             else:
                 image_names = [Path(img).name for img in input_images]
                 images_display = f"**Input Images ({len(input_images)}):**\n" + "\n".join(
-                    f"  {i+1}. {name}" for i, name in enumerate(image_names)
+                    f"  {i + 1}. {name}" for i, name in enumerate(image_names)
                 )
 
             info = f"""
@@ -479,15 +492,14 @@ def generate_image(
         # Unexpected error
         logger.error(f"Error generating image: {e}", exc_info=True)
         error_msg = (
-            f"❌ **Error**\n\nAn unexpected error occurred. "
-            f"Check logs for details.\n\n`{str(e)}`"
+            f"❌ **Error**\n\nAn unexpected error occurred. Check logs for details.\n\n`{str(e)}`"
         )
         return [], error_msg, str(seed), state
 
 
 def toggle_plugin_ui(
     plugin_name: str, enabled: bool, state: UIState, **plugin_config
-) -> tuple[gr.Group, UIState]:
+) -> tuple[dict[str, Any], UIState]:
     """Toggle a plugin on/off and update its configuration.
 
     Args:
@@ -505,7 +517,7 @@ def toggle_plugin_ui(
 
 def toggle_save_metadata_handler(
     enabled: bool, folder: str, prefix: str, state: UIState
-) -> tuple[gr.Group, UIState]:
+) -> tuple[dict[str, Any], UIState]:
     """Handle SaveMetadata plugin toggle with configuration.
 
     Args:

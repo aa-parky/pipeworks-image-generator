@@ -224,7 +224,6 @@ def switch_model(state: UIState, model_name: str) -> UIState:
 
         # Update state
         state.current_model_name = model_name
-        state.generator = state.model_adapter  # Maintain backward compatibility
 
         logger.info(f"Successfully switched to model: {model_name}")
         return state
@@ -265,7 +264,6 @@ def cleanup_ui_state(state: UIState) -> None:
 
         # Clear references
         state.model_adapter = None
-        state.generator = None  # Also clear legacy reference
         state.tokenizer_analyzer = None
         state.prompt_builder = None
         state.gallery_browser = None

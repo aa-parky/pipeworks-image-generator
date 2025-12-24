@@ -25,6 +25,10 @@ def analyze_prompt(prompt: str, state: UIState) -> tuple[str, UIState]:
         # Initialize state if needed
         state = initialize_ui_state(state)
 
+        # Check if tokenizer is available
+        if state.tokenizer_analyzer is None:
+            return "*Tokenizer not initialized*", state
+
         # Analyze the prompt
         analysis = state.tokenizer_analyzer.analyze(prompt)
 

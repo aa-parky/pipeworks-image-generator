@@ -1,6 +1,7 @@
 """Gradio UI for Pipeworks Image Generator - Refactored Version."""
 
 import logging
+from typing import Any
 
 import gradio as gr
 
@@ -425,7 +426,7 @@ def create_generation_tab(ui_state):
     # Condition generation handlers (Start 2 and Start 3)
     # =========================================================================
 
-    def toggle_condition_type_handler(condition_type: str) -> tuple[str, gr.update]:
+    def toggle_condition_type_handler(condition_type: str) -> tuple[str, dict[str, Any]]:
         """Show/hide condition controls and generate initial condition.
 
         Uses random seed by default for variety.

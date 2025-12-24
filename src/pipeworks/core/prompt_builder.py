@@ -155,7 +155,7 @@ class PromptBuilder:
             inputs_dir: Directory containing input text files
         """
         self.inputs_dir = Path(inputs_dir)
-        self._file_cache = {}  # Cache file contents
+        self._file_cache: dict[str, list[str]] = {}  # Cache file contents
 
     def scan_text_files(self) -> list[str]:
         """

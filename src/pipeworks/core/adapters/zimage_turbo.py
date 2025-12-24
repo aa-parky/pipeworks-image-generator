@@ -209,30 +209,32 @@ class ZImageTurboAdapter(ModelAdapterBase):
 
             # Move model to target device (CUDA preferred for speed)
             # If CPU offloading is enabled, model components are moved dynamically
+            assert self.pipe is not None, "Pipeline should be loaded at this point"
+
             if not self.config.enable_model_cpu_offload:
                 # Standard approach: keep entire model on device
-                self.pipe.to(self.config.device)
+                self.pipe.to(self.config.device)  # type: ignore[union-attr]
             else:
                 # Memory-efficient approach: move layers to CPU when not in use
-                self.pipe.enable_model_cpu_offload()
+                self.pipe.enable_model_cpu_offload()  # type: ignore[union-attr]
                 logger.info("Enabled model CPU offloading")
 
             # Apply performance optimizations
             # Attention slicing reduces VRAM usage at slight speed cost
             if self.config.enable_attention_slicing:
-                self.pipe.enable_attention_slicing()
+                self.pipe.enable_attention_slicing()  # type: ignore[union-attr]
                 logger.info("Enabled attention slicing")
 
             # Use alternative attention backend (e.g., Flash-Attention-2)
             if self.config.attention_backend != "default":
-                self.pipe.transformer.set_attention_backend(self.config.attention_backend)
+                self.pipe.transformer.set_attention_backend(self.config.attention_backend)  # type: ignore[union-attr]
                 logger.info(f"Set attention backend to: {self.config.attention_backend}")
 
             # Compile model with torch.compile for faster inference
             # First run is slower, subsequent runs are faster
             if self.config.compile_model:
                 logger.info("Compiling model (this may take a while on first run)...")
-                self.pipe.transformer.compile()
+                self.pipe.transformer.compile()  # type: ignore[union-attr]
                 logger.info("Model compiled successfully")
 
             self._model_loaded = True
@@ -242,15 +244,7 @@ class ZImageTurboAdapter(ModelAdapterBase):
             logger.error(f"Failed to load Z-Image-Turbo model: {e}")
             raise
 
-    def generate(
-        self,
-        prompt: str,
-        width: int | None = None,
-        height: int | None = None,
-        num_inference_steps: int | None = None,
-        seed: int | None = None,
-        guidance_scale: float | None = None,
-    ) -> Image.Image:
+    def generate(self, **kwargs) -> Image.Image:
         """Generate an image from a text prompt.
 
         Args:
@@ -280,6 +274,14 @@ class ZImageTurboAdapter(ModelAdapterBase):
         if not self._model_loaded:
             self.load_model()
 
+        # Extract parameters from kwargs
+        prompt: str = kwargs.get("prompt", "")
+        width: int | None = kwargs.get("width")
+        height: int | None = kwargs.get("height")
+        num_inference_steps: int | None = kwargs.get("num_inference_steps")
+        seed: int | None = kwargs.get("seed")
+        guidance_scale: float | None = kwargs.get("guidance_scale")
+
         # Use config defaults if not specified
         width = width or self.config.default_width
         height = height or self.config.default_height
@@ -306,7 +308,8 @@ class ZImageTurboAdapter(ModelAdapterBase):
 
         try:
             # Generate image
-            output = self.pipe(
+            assert self.pipe is not None, "Pipeline should be loaded at this point"
+            output = self.pipe(  # type: ignore[operator]
                 prompt=prompt,
                 height=height,
                 width=width,
@@ -315,23 +318,16 @@ class ZImageTurboAdapter(ModelAdapterBase):
                 generator=generator,
             )
 
-            image = output.images[0]
+            image: Image.Image = output.images[0]  # type: ignore[no-any-return]
             logger.info("Image generated successfully!")
-            return image
+            return image  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.error(f"Failed to generate image: {e}")
             raise
 
     def generate_and_save(
-        self,
-        prompt: str,
-        width: int | None = None,
-        height: int | None = None,
-        num_inference_steps: int | None = None,
-        seed: int | None = None,
-        guidance_scale: float | None = None,
-        output_path: Path | None = None,
+        self, output_path: Path | None = None, **kwargs
     ) -> tuple[Image.Image, Path]:
         """Generate an image and save it to disk with plugin hooks.
 
@@ -363,6 +359,14 @@ class ZImageTurboAdapter(ModelAdapterBase):
         Exception
             If generation or save fails
         """
+        # Extract parameters from kwargs
+        prompt: str = kwargs.get("prompt", "")
+        width: int | None = kwargs.get("width")
+        height: int | None = kwargs.get("height")
+        num_inference_steps: int | None = kwargs.get("num_inference_steps")
+        seed: int | None = kwargs.get("seed")
+        # Note: guidance_scale ignored - Turbo models require 0.0
+
         # Use config defaults if not specified
         width = width or self.config.default_width
         height = height or self.config.default_height
@@ -387,14 +391,7 @@ class ZImageTurboAdapter(ModelAdapterBase):
                 params = plugin.on_generate_start(params)
 
         # Generate image using potentially modified params from plugins
-        image = self.generate(
-            prompt=params["prompt"],
-            width=params["width"],
-            height=params["height"],
-            num_inference_steps=params["num_inference_steps"],
-            seed=params["seed"],
-            guidance_scale=params["guidance_scale"],
-        )
+        image = self.generate(**params)
 
         # Plugin Hook 2: on_generate_complete
         # Allows plugins to modify the generated image after generation

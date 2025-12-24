@@ -236,8 +236,7 @@ def generate_condition(seed: int | None = None) -> dict[str, str]:
                     removed_value = chosen.pop(blocked_axis)
                     exclusions_applied += 1
                     logger.debug(
-                        f"  Removed {blocked_axis}={removed_value} "
-                        f"(conflicts with {axis}={value})"
+                        f"  Removed {blocked_axis}={removed_value} (conflicts with {axis}={value})"
                     )
 
     if exclusions_applied > 0:

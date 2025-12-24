@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import gradio as gr
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def load_gallery_folder(
     selected_item: str, current_path: str, state: UIState
-) -> tuple[gr.Dropdown, str, list[str], UIState]:
+) -> tuple[dict[str, Any], str, list[str], UIState]:
     """Navigate folders or load images from current path.
 
     Args:
@@ -27,6 +28,10 @@ def load_gallery_folder(
     try:
         # Initialize state if needed
         state = initialize_ui_state(state)
+
+        # Check if gallery_browser is available
+        if state.gallery_browser is None:
+            return gr.update(), current_path, state.gallery_images, state
 
         # Handle folder navigation
         if selected_item and selected_item.startswith("📁"):
@@ -102,7 +107,7 @@ def select_gallery_image(
 
         # Check if we have images cached
         if not state.gallery_images or selected_index >= len(state.gallery_images):
-            return None, "*No image selected*", "☆ Favorite", state
+            return "", "*No image selected*", "☆ Favorite", state
 
         # Get image path
         image_path = state.gallery_images[selected_index]
@@ -110,6 +115,10 @@ def select_gallery_image(
 
         # Store selected index in state
         state.gallery_selected_index = selected_index
+
+        # Check required components are available
+        if state.favorites_db is None or state.gallery_browser is None:
+            return image_path, "*Error: Gallery components not initialized*", "☆ Favorite", state
 
         # Check if image is favorited
         is_favorited = state.favorites_db.is_favorite(image_path)
@@ -127,7 +136,7 @@ def select_gallery_image(
 
     except Exception as e:
         logger.error(f"Error selecting gallery image: {e}", exc_info=True)
-        return None, f"*Error loading image: {str(e)}*", "☆ Favorite", state
+        return "", f"*Error loading image: {str(e)}*", "☆ Favorite", state
 
 
 def refresh_gallery(current_path: str, state: UIState) -> tuple[list[str], UIState]:
@@ -143,6 +152,10 @@ def refresh_gallery(current_path: str, state: UIState) -> tuple[list[str], UISta
     try:
         # Initialize state if needed
         state = initialize_ui_state(state)
+
+        # Check if gallery_browser is available
+        if state.gallery_browser is None:
+            return [], state
 
         # Scan for images
         images = state.gallery_browser.scan_images(current_path)
@@ -183,6 +196,10 @@ def toggle_metadata_format(show_json: str, state: UIState) -> tuple[str, UIState
         image_path = state.gallery_images[state.gallery_selected_index]
         image_name = Path(image_path).name
 
+        # Check if gallery_browser is available
+        if state.gallery_browser is None:
+            return "*Error: Gallery browser not initialized*", state
+
         # Read metadata based on toggle
         if "JSON" in show_json:
             json_data = state.gallery_browser.read_json_metadata(image_path)
@@ -198,7 +215,7 @@ def toggle_metadata_format(show_json: str, state: UIState) -> tuple[str, UIState
         return f"*Error loading metadata: {str(e)}*", state
 
 
-def initialize_gallery_browser(state: UIState) -> tuple[gr.Dropdown, str, list[str], UIState]:
+def initialize_gallery_browser(state: UIState) -> tuple[dict[str, Any], str, list[str], UIState]:
     """Initialize gallery browser on tab load.
 
     Args:
@@ -226,6 +243,10 @@ def initialize_gallery_browser(state: UIState) -> tuple[gr.Dropdown, str, list[s
         # Start at root of outputs directory
         current_path = ""
         state.gallery_current_path = current_path
+
+        # Check if gallery_browser is available
+        if state.gallery_browser is None:
+            return gr.update(choices=["(Error)"]), "", [], state
 
         # Get folders and images at root
         folders, _ = state.gallery_browser.get_items_in_path(current_path)
@@ -272,6 +293,10 @@ def toggle_favorite(state: UIState) -> tuple[str, str, UIState]:
 
         image_path = state.gallery_images[selected_index]
 
+        # Check if favorites_db is available
+        if state.favorites_db is None:
+            return "☆ Favorite", "*Error: Favorites database not initialized*", state
+
         # Toggle favorite status
         is_now_favorited = state.favorites_db.toggle_favorite(image_path)
 
@@ -307,6 +332,10 @@ def apply_gallery_filter(
     try:
         # Initialize state if needed
         state = initialize_ui_state(state)
+
+        # Check if required components are available
+        if state.gallery_browser is None or state.favorites_db is None:
+            return [], state
 
         # Get all images in current path
         all_images = state.gallery_browser.scan_images(current_path)
@@ -345,6 +374,14 @@ def move_favorites_to_catalog(state: UIState) -> tuple[str, list[str], UIState]:
     try:
         # Initialize state if needed
         state = initialize_ui_state(state)
+
+        # Check if required components are available
+        if (
+            state.favorites_db is None
+            or state.catalog_manager is None
+            or state.gallery_browser is None
+        ):
+            return "*Error: Required components not initialized*", state.gallery_images, state
 
         # Get count before move
         favorite_count = state.favorites_db.get_favorite_count()
@@ -392,7 +429,7 @@ def move_favorites_to_catalog(state: UIState) -> tuple[str, list[str], UIState]:
 
 def switch_gallery_root(
     root_choice: str, state: UIState
-) -> tuple[gr.Dropdown, str, list[str], UIState]:
+) -> tuple[dict[str, Any], str, list[str], UIState]:
     """Switch between outputs and catalog browsing.
 
     Args:
@@ -405,6 +442,10 @@ def switch_gallery_root(
     try:
         # Initialize state if needed
         state = initialize_ui_state(state)
+
+        # Check if gallery_browser is available
+        if state.gallery_browser is None:
+            return gr.update(), state.gallery_current_path, state.gallery_images, state
 
         # Extract root name (remove emoji prefix)
         root_name = root_choice.replace("📁 ", "").strip()

@@ -105,7 +105,6 @@ jobs:
     - name: Run mypy
       run: |
         mypy src/pipeworks/ui/ --ignore-missing-imports
-      continue-on-error: true  # Don't fail CI on mypy errors initially
 
   security:
     name: Security Scan

@@ -1,5 +1,7 @@
 """Adapter functions for converting between UI values and business objects."""
 
+from typing import Any
+
 from .components import SegmentUI
 from .models import SegmentConfig
 
@@ -28,7 +30,7 @@ def convert_segment_values_to_configs(
     )
 
 
-def split_segment_inputs(values: list) -> tuple[tuple, tuple, tuple, any]:
+def split_segment_inputs(values: list) -> tuple[tuple, tuple, tuple, Any]:
     """Split combined input list into segment groups.
 
     Args:

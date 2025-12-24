@@ -123,7 +123,7 @@ def validate_segments(segments: tuple[SegmentConfig, ...], base_dir: Path, promp
         ]
     else:
         # Fallback for any other count
-        segment_names = [f"Segment {i+1}" for i in range(len(segments))]
+        segment_names = [f"Segment {i + 1}" for i in range(len(segments))]
 
     # Check if any segment has dynamic flag set
     has_dynamic = any(seg.dynamic for seg in segments)
@@ -134,8 +134,7 @@ def validate_segments(segments: tuple[SegmentConfig, ...], base_dir: Path, promp
     # Validate that we have some input
     if not has_segment_content and (not prompt or not prompt.strip()):
         raise ValidationError(
-            "Please provide either a prompt or configure at least one segment "
-            "in the Prompt Builder"
+            "Please provide either a prompt or configure at least one segment in the Prompt Builder"
         )
 
     # Validate each configured segment's file path
@@ -169,8 +168,7 @@ def validate_prompt_content(prompt: str, max_length: int = 1000) -> None:
     """
     if len(prompt) > max_length:
         raise ValidationError(
-            f"Prompt is too long ({len(prompt)} characters). "
-            f"Maximum is {max_length} characters."
+            f"Prompt is too long ({len(prompt)} characters). Maximum is {max_length} characters."
         )
 
     # Check for obviously invalid prompts

@@ -3,6 +3,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -201,8 +202,8 @@ class GalleryBrowser:
         Returns:
             Text content (prompt) or None if not found
         """
-        image_path = Path(image_path)
-        txt_path = image_path.with_suffix(".txt")
+        image_path_obj = Path(image_path)
+        txt_path = image_path_obj.with_suffix(".txt")
 
         if not txt_path.exists():
             return None
@@ -214,7 +215,7 @@ class GalleryBrowser:
             logger.error(f"Error reading {txt_path}: {e}")
             return None
 
-    def read_json_metadata(self, image_path: str) -> dict | None:
+    def read_json_metadata(self, image_path: str) -> dict[str, Any] | None:
         """
         Read .json metadata file for an image.
 
@@ -224,15 +225,18 @@ class GalleryBrowser:
         Returns:
             Parsed JSON dictionary or None if not found
         """
-        image_path = Path(image_path)
-        json_path = image_path.with_suffix(".json")
+        image_path_obj = Path(image_path)
+        json_path = image_path_obj.with_suffix(".json")
 
         if not json_path.exists():
             return None
 
         try:
             with open(json_path, encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                return None
         except Exception as e:
             logger.error(f"Error reading {json_path}: {e}")
             return None
@@ -253,7 +257,7 @@ class GalleryBrowser:
 
         return f"**{image_name}**\n\n**Prompt:**\n\n{txt_content}"
 
-    def format_metadata_json(self, json_data: dict | None, image_name: str) -> str:
+    def format_metadata_json(self, json_data: dict[str, Any] | None, image_name: str) -> str:
         """
         Format .json metadata as Markdown table for display.
 

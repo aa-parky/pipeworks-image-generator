@@ -86,7 +86,7 @@ class GenerationParams:
         total = self.batch_size * self.runs
         if total > 1000:
             raise ValueError(
-                f"Total images ({total}) exceeds maximum of 1000. " f"Reduce batch size or runs."
+                f"Total images ({total}) exceeds maximum of 1000. Reduce batch size or runs."
             )
 
         # Validate dimensions are multiples of 64

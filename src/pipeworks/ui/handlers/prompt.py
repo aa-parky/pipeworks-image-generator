@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import gradio as gr
 
@@ -12,7 +13,7 @@ from ..validation import ValidationError
 logger = logging.getLogger(__name__)
 
 
-def get_items_in_path(current_path: str, state: UIState) -> tuple[gr.Dropdown, str, UIState]:
+def get_items_in_path(current_path: str, state: UIState) -> tuple[dict[str, Any], str, UIState]:
     """Get folders and files at the current path level.
 
     Args:
@@ -24,6 +25,10 @@ def get_items_in_path(current_path: str, state: UIState) -> tuple[gr.Dropdown, s
     """
     # Initialize state if needed
     state = initialize_ui_state(state)
+
+    # Check if prompt_builder is available
+    if state.prompt_builder is None:
+        return gr.update(), current_path, state
 
     folders, files = state.prompt_builder.get_items_in_path(current_path)
 
@@ -49,7 +54,7 @@ def get_items_in_path(current_path: str, state: UIState) -> tuple[gr.Dropdown, s
 
 def navigate_file_selection(
     selected: str, current_path: str, state: UIState
-) -> tuple[gr.Dropdown, str, UIState]:
+) -> tuple[dict[str, Any], str, UIState]:
     """Handle folder navigation when an item is selected.
 
     Args:
@@ -123,6 +128,10 @@ def build_combined_prompt(
     # Initialize state if needed
     state = initialize_ui_state(state)
 
+    # Check if prompt_builder is available
+    if state.prompt_builder is None:
+        raise ValidationError("Prompt builder not initialized")
+
     segments = []
 
     # Helper to add segment
@@ -153,6 +162,8 @@ def build_combined_prompt(
 
         # Case 3: Only file - add as lazy tuple (unchanged from current)
         if has_file and not has_text:
+            if state.prompt_builder is None:
+                return
             full_path = state.prompt_builder.get_full_path(segment.path, segment.file)
 
             if segment.mode == "Random Line":
@@ -173,6 +184,9 @@ def build_combined_prompt(
 
         # Case 4: Both text and file - resolve file early and combine
         if has_text and has_file:
+            if state.prompt_builder is None:
+                segments.append(("text", segment.text.strip()))
+                return
             full_path = state.prompt_builder.get_full_path(segment.path, segment.file)
 
             # Resolve file content based on mode

@@ -1,5 +1,7 @@
 """Reusable UI components for Pipeworks Gradio interface."""
 
+from typing import Any
+
 import gradio as gr
 
 from .models import (
@@ -156,7 +158,12 @@ class SegmentUI:
 
     def get_mode_visibility_outputs(
         self,
-    ) -> tuple[gr.Number, gr.Number, gr.Number, gr.Number]:
+    ) -> tuple[
+        gr.components.Component,
+        gr.components.Component,
+        gr.components.Component,
+        gr.components.Component,
+    ]:
         """Return components that change visibility based on mode.
 
         Returns:
@@ -238,7 +245,9 @@ class SegmentUI:
             return f"**{name}**"
 
 
-def update_mode_visibility(mode: str) -> tuple[gr.Number, gr.Number, gr.Number, gr.Number]:
+def update_mode_visibility(
+    mode: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Update visibility of line number inputs based on selected mode.
 
     Args:

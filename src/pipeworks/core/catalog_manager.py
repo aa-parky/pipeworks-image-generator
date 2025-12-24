@@ -34,8 +34,7 @@ class CatalogManager:
         self.catalog_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(
-            f"Initialized CatalogManager: outputs={self.outputs_dir}, "
-            f"catalog={self.catalog_dir}"
+            f"Initialized CatalogManager: outputs={self.outputs_dir}, catalog={self.catalog_dir}"
         )
 
     def move_favorites_to_catalog(self) -> dict[str, Any]:
@@ -63,7 +62,7 @@ class CatalogManager:
         """
         logger.info("Starting bulk move of favorites to catalog")
 
-        stats = {"moved": 0, "skipped": 0, "failed": 0, "errors": []}
+        stats: dict[str, Any] = {"moved": 0, "skipped": 0, "failed": 0, "errors": []}
 
         # Get all favorites
         all_favorites = self.favorites_db.get_all_favorites()
@@ -103,7 +102,7 @@ class CatalogManager:
                 # Skip if image doesn't exist
                 if not image_path.exists():
                     logger.warning(f"Image not found (may have been moved already): {image_path}")
-                    stats["skipped"] += 1
+                    stats["skipped"] += 1  # type: ignore[assignment]
                     # Remove from favorites since file doesn't exist
                     self.favorites_db.remove_favorite(image_path_str)
                     continue
@@ -112,17 +111,19 @@ class CatalogManager:
                 success = self._move_image_with_metadata(image_path)
 
                 if success:
-                    stats["moved"] += 1
+                    stats["moved"] += 1  # type: ignore[assignment]
                     # Remove from favorites DB after successful move
                     self.favorites_db.remove_favorite(image_path_str)
                 else:
-                    stats["failed"] += 1
-                    stats["errors"].append(f"Failed to move: {image_path}")
+                    stats["failed"] += 1  # type: ignore[assignment]
+                    if isinstance(stats["errors"], list):
+                        stats["errors"].append(f"Failed to move: {image_path}")
 
             except Exception as e:
                 logger.error(f"Error processing {image_path_str}: {e}", exc_info=True)
-                stats["failed"] += 1
-                stats["errors"].append(f"{image_path_str}: {str(e)}")
+                stats["failed"] += 1  # type: ignore[assignment]
+                if isinstance(stats["errors"], list):
+                    stats["errors"].append(f"{image_path_str}: {str(e)}")
 
         logger.info(
             f"Move operation complete: moved={stats['moved']}, "
@@ -215,7 +216,7 @@ class CatalogManager:
         Returns:
             List of validation warnings
         """
-        warnings = []
+        warnings: list[str] = []
 
         try:
             if not self.catalog_dir.exists():

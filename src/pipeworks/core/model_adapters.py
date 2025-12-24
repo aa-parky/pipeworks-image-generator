@@ -352,7 +352,7 @@ class ModelRegistry:
         if adapter_name not in self._adapters:
             available = ", ".join(self.list_available())
             raise KeyError(
-                f"Model adapter '{adapter_name}' not found. " f"Available adapters: {available}"
+                f"Model adapter '{adapter_name}' not found. Available adapters: {available}"
             )
 
         adapter_class = self._adapters[adapter_name]
@@ -418,11 +418,13 @@ class ModelRegistry:
         list[dict[str, Any]]
             List of adapter metadata dictionaries
         """
-        return [
-            self.get_adapter_info(name)
-            for name, adapter_class in self._adapters.items()
-            if adapter_class.model_type == model_type
-        ]
+        result = []
+        for name, adapter_class in self._adapters.items():
+            if adapter_class.model_type == model_type:
+                info = self.get_adapter_info(name)
+                if info is not None:
+                    result.append(info)
+        return result
 
 
 # Global model registry instance

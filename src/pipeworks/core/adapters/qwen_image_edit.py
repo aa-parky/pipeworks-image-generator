@@ -370,6 +370,9 @@ class QwenImageEditAdapter(ModelAdapterBase):
                     logger.warning("Could not check VRAM - defaulting to CPU offloading")
                     use_cpu_offload = True
 
+            if self.pipe is None:
+                raise RuntimeError("Pipeline not loaded")
+
             if not use_cpu_offload:
                 logger.info(f"Moving full model to device: {self.config.device}")
                 try:
@@ -486,16 +489,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
         """
         return self._model_loaded and self.pipe is not None
 
-    def generate(
-        self,
-        input_image: Image.Image | list[Image.Image],
-        instruction: str,
-        num_inference_steps: int | None = None,
-        guidance_scale: float = 1.0,
-        true_cfg_scale: float = 4.0,
-        seed: int | None = None,
-        negative_prompt: str = " ",
-    ) -> Image.Image:
+    def generate(self, **kwargs) -> Image.Image:
         """Edit or composite image(s) based on a natural language instruction.
 
         Args:
@@ -529,6 +523,15 @@ class QwenImageEditAdapter(ModelAdapterBase):
         - Same inputs + seed = same output (reproducible)
         - First inference after loading takes longer due to CUDA compilation
         """
+        # Extract parameters from kwargs
+        input_image: Image.Image | list[Image.Image] | None = kwargs.get("input_image")
+        instruction: str = kwargs.get("instruction", "")
+        num_inference_steps: int | None = kwargs.get("num_inference_steps")
+        guidance_scale: float = kwargs.get("guidance_scale", 1.0)
+        true_cfg_scale: float = kwargs.get("true_cfg_scale", 4.0)
+        seed: int | None = kwargs.get("seed")
+        negative_prompt: str = kwargs.get("negative_prompt", " ")
+
         if not self._model_loaded:
             self.load_model()
 
@@ -578,6 +581,9 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
             # Run inference with proper parameters for Qwen-Image-Edit-2509
             # The pipeline expects a list of images
+            if self.pipe is None:
+                raise RuntimeError("Pipeline not loaded")
+
             with torch.inference_mode():
                 output = self.pipe(
                     image=processed_images,  # List of 1-3 images
@@ -596,7 +602,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
             image = output.images[0]
 
             logger.info(
-                f"Image edited successfully in {inference_time:.2f}s. " f"Output size: {image.size}"
+                f"Image edited successfully in {inference_time:.2f}s. Output size: {image.size}"
             )
 
             return image
@@ -610,15 +616,7 @@ class QwenImageEditAdapter(ModelAdapterBase):
             self._clear_gpu_memory()
 
     def generate_and_save(
-        self,
-        input_image: Image.Image,
-        instruction: str,
-        num_inference_steps: int | None = None,
-        guidance_scale: float = 1.0,
-        true_cfg_scale: float = 4.0,
-        seed: int | None = None,
-        negative_prompt: str = " ",
-        output_path: Path | None = None,
+        self, output_path: Path | None = None, **kwargs
     ) -> tuple[Image.Image, Path]:
         """Edit an image and save it to disk with plugin hooks.
 
@@ -658,48 +656,51 @@ class QwenImageEditAdapter(ModelAdapterBase):
         - Auto-generated paths use timestamp and instruction prefix
         - Plugins are called in registration order
         """
+        # Extract parameters from kwargs
+        input_image: Image.Image | list[Image.Image] | None = kwargs.get("input_image")
+        instruction: str = kwargs.get("instruction", "")
+        num_inference_steps: int | None = kwargs.get("num_inference_steps")
+        guidance_scale: float = kwargs.get("guidance_scale", 1.0)
+        true_cfg_scale: float = kwargs.get("true_cfg_scale", 4.0)
+        seed: int | None = kwargs.get("seed")
+        negative_prompt: str = kwargs.get("negative_prompt", " ")
+
+        # Build params dict for plugins
+        params = {
+            "input_image": input_image,
+            "instruction": instruction,
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+            "true_cfg_scale": true_cfg_scale,
+            "seed": seed,
+            "negative_prompt": negative_prompt,
+            "model_id": self.model_id,
+            "model_name": self.name,
+        }
+
         # Call plugin hooks for generation start
         for plugin in self.plugins:
-            if hasattr(plugin, "on_generate_start"):
-                plugin.on_generate_start(
-                    adapter=self,
-                    input_image=input_image,
-                    instruction=instruction,
-                    num_inference_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    seed=seed,
-                )
+            if plugin.enabled:
+                params = plugin.on_generate_start(params)
 
-        # Edit image
-        edited_image = self.generate(
-            input_image=input_image,
-            instruction=instruction,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            true_cfg_scale=true_cfg_scale,
-            seed=seed,
-            negative_prompt=negative_prompt,
-        )
+        # Edit image using potentially modified params from plugins
+        edited_image = self.generate(**params)
 
         # Call plugin hooks for generation complete
         for plugin in self.plugins:
-            if hasattr(plugin, "on_generate_complete"):
-                edited_image = (
-                    plugin.on_generate_complete(
-                        adapter=self,
-                        image=edited_image,
-                        instruction=instruction,
-                    )
-                    or edited_image
-                )
+            if plugin.enabled:
+                edited_image = plugin.on_generate_complete(edited_image, params)
 
         # Determine output path
         if output_path is None:
             # Auto-generate path with timestamp and instruction prefix
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             # Use first 30 chars of instruction, sanitized
+            instruction_str = params.get("instruction", "")
+            if not isinstance(instruction_str, str):
+                instruction_str = str(instruction_str)
             instruction_prefix = (
-                instruction[:30].replace(" ", "_").replace("/", "_").replace("\\", "_")
+                instruction_str[:30].replace(" ", "_").replace("/", "_").replace("\\", "_")
             )
             filename = f"qwen_edit_{timestamp}_{instruction_prefix}.png"
             output_path = self.config.outputs_dir / filename
@@ -711,12 +712,10 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
         # Call plugin hooks for before save
         for plugin in self.plugins:
-            if hasattr(plugin, "on_before_save"):
-                edited_image, output_path = plugin.on_before_save(
-                    adapter=self,
-                    image=edited_image,
-                    output_path=output_path,
-                ) or (edited_image, output_path)
+            if plugin.enabled:
+                result = plugin.on_before_save(edited_image, output_path, params)
+                if result is not None:
+                    edited_image, output_path = result
 
         # Save image
         try:
@@ -728,12 +727,8 @@ class QwenImageEditAdapter(ModelAdapterBase):
 
         # Call plugin hooks for after save
         for plugin in self.plugins:
-            if hasattr(plugin, "on_after_save"):
-                plugin.on_after_save(
-                    adapter=self,
-                    image=edited_image,
-                    output_path=output_path,
-                )
+            if plugin.enabled:
+                plugin.on_after_save(edited_image, output_path, params)
 
         return edited_image, output_path
 

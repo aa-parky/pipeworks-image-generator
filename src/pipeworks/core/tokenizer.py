@@ -67,6 +67,7 @@ See Also
 
 import logging
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ class TokenizerAnalyzer:
             logger.error(f"Failed to load tokenizer: {e}")
             raise
 
-    def analyze(self, text: str) -> dict[str, any]:
+    def analyze(self, text: str) -> dict[str, Any]:
         """Analyze a text prompt and return tokenization details.
 
         This method tokenizes the input text and provides detailed information
@@ -204,6 +205,9 @@ class TokenizerAnalyzer:
         # Tokenize the text using HuggingFace tokenizer
         # return_tensors="pt" returns PyTorch tensors
         # add_special_tokens=False excludes BOS/EOS tokens for cleaner analysis
+        if self.tokenizer is None:
+            raise RuntimeError("Tokenizer not loaded. Call load() first.")
+
         encoded = self.tokenizer(text, return_tensors="pt", add_special_tokens=False)
         token_ids = encoded["input_ids"][0].tolist()
 
@@ -240,7 +244,7 @@ class TokenizerAnalyzer:
         # Use | as separator and wrap each token
         return " | ".join([f"'{token}'" for token in tokens])
 
-    def get_info(self) -> dict[str, any]:
+    def get_info(self) -> dict[str, Any]:
         """
         Get tokenizer information.
 
@@ -249,6 +253,9 @@ class TokenizerAnalyzer:
         """
         if not self._loaded:
             self.load()
+
+        if self.tokenizer is None:
+            raise RuntimeError("Tokenizer not loaded. Call load() first.")
 
         return {
             "name": self.tokenizer.__class__.__name__,

@@ -85,6 +85,5 @@ def format_generation_error(error: Exception) -> str:
         Formatted markdown error message
     """
     return (
-        f"❌ **Error**\n\nAn unexpected error occurred. "
-        f"Check logs for details.\n\n`{str(error)}`"
+        f"❌ **Error**\n\nAn unexpected error occurred. Check logs for details.\n\n`{str(error)}`"
     )
