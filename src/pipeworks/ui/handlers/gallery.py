@@ -235,7 +235,9 @@ def toggle_metadata_format(show_json: str, state: UIState) -> tuple[str, UIState
         return f"*Error loading metadata: {str(e)}*", state
 
 
-def initialize_gallery_browser(state: UIState) -> tuple[dict[str, Any], str, list[str], UIState]:
+def initialize_gallery_browser(
+    state: UIState,
+) -> tuple[dict[str, Any], str, dict[str, Any], UIState]:
     """Initialize gallery browser on tab load.
 
     This function is called every time the Gallery Browser tab is selected.
@@ -246,7 +248,7 @@ def initialize_gallery_browser(state: UIState) -> tuple[dict[str, Any], str, lis
         state: UI state
 
     Returns:
-        Tuple of (dropdown_update, current_path, gallery_images, updated_state)
+        Tuple of (dropdown_update, current_path, gallery_update, updated_state)
     """
     try:
         # Initialize state if needed
@@ -264,7 +266,7 @@ def initialize_gallery_browser(state: UIState) -> tuple[dict[str, Any], str, lis
 
         # Check if gallery_browser is available
         if state.gallery_browser is None:
-            return gr.update(choices=["(Error)"]), "", [], state
+            return gr.update(choices=["(Error)"]), "", gr.update(), state
 
         # Get folders and images at current path
         folders, _ = state.gallery_browser.get_items_in_path(current_path)
