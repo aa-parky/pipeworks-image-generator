@@ -62,6 +62,7 @@ def initialize_ui_state(state: UIState | None = None, model_name: str | None = N
             state.model_adapter = model_registry.instantiate(
                 state.current_model_name, config, plugins=[]
             )
+            state.generator = state.model_adapter  # type: ignore[attr-defined]  # Backward compatibility
             # Pre-load model (skip in offline mode)
             if os.environ.get("HF_HUB_OFFLINE") != "1":
                 try:
@@ -224,6 +225,7 @@ def switch_model(state: UIState, model_name: str) -> UIState:
 
         # Update state
         state.current_model_name = model_name
+        state.generator = state.model_adapter  # type: ignore[attr-defined]  # Backward compatibility
 
         logger.info(f"Successfully switched to model: {model_name}")
         return state
@@ -264,6 +266,7 @@ def cleanup_ui_state(state: UIState) -> None:
 
         # Clear references
         state.model_adapter = None
+        state.generator = None  # type: ignore[attr-defined]  # Backward compatibility
         state.tokenizer_analyzer = None
         state.prompt_builder = None
         state.gallery_browser = None
