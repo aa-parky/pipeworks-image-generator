@@ -13,7 +13,7 @@ The system is designed for procedural character generation in both visual
 (image generation prompts) and narrative (MUD/game) contexts.
 
 Example usage:
-    >>> from pipeworks.core.character_conditions import generate_condition, condition_to_prompt
+    >>> from pipeworks.core.condition_axis import generate_condition, condition_to_prompt
     >>> condition = generate_condition(seed=42)
     >>> prompt_fragment = condition_to_prompt(condition)
     >>> print(prompt_fragment)
@@ -31,6 +31,8 @@ Architecture:
 import logging
 import random
 from typing import Any
+
+from ._base import apply_exclusion_rules, values_to_prompt, weighted_choice
 
 logger = logging.getLogger(__name__)
 
@@ -122,37 +124,6 @@ EXCLUSIONS: dict[tuple[str, str], dict[str, list[str]]] = {
 # ============================================================================
 
 
-def weighted_choice(options: list[str], weights: dict[str, float] | None = None) -> str:
-    """Select a random option with optional weighted probabilities.
-
-    Args:
-        options: List of possible values to choose from
-        weights: Optional dictionary mapping options to weights.
-                If None or missing entries, defaults to uniform distribution.
-
-    Returns:
-        Randomly selected option (str)
-
-    Examples:
-        >>> # Uniform distribution
-        >>> weighted_choice(["a", "b", "c"])
-        'b'
-
-        >>> # Weighted distribution (more likely to pick "common")
-        >>> weighted_choice(["rare", "common"], {"rare": 1, "common": 5})
-        'common'
-    """
-    if not weights:
-        return random.choice(options)
-
-    # Build weight list matching option order
-    # Use weight of 1.0 for any option not in the weights dict
-    weight_values = [weights.get(option, 1.0) for option in options]
-
-    # random.choices returns a list of k elements, we want just one
-    return random.choices(options, weights=weight_values, k=1)[0]
-
-
 def generate_condition(seed: int | None = None) -> dict[str, str]:
     """Generate a coherent character condition using weighted random selection.
 
@@ -223,24 +194,7 @@ def generate_condition(seed: int | None = None) -> dict[str, str]:
     # PHASE 3: Apply semantic exclusion rules
     # Remove illogical combinations (e.g., decadent + frail)
     # ========================================================================
-    exclusions_applied = 0
-
-    for (axis, value), blocked in EXCLUSIONS.items():
-        # Check if this exclusion rule is triggered
-        if chosen.get(axis) == value:
-            logger.debug(f"Exclusion rule triggered: {axis}={value}")
-
-            # Check each blocked axis
-            for blocked_axis, blocked_values in blocked.items():
-                if chosen.get(blocked_axis) in blocked_values:
-                    removed_value = chosen.pop(blocked_axis)
-                    exclusions_applied += 1
-                    logger.debug(
-                        f"  Removed {blocked_axis}={removed_value} (conflicts with {axis}={value})"
-                    )
-
-    if exclusions_applied > 0:
-        logger.info(f"Applied {exclusions_applied} exclusion rule(s)")
+    apply_exclusion_rules(chosen, EXCLUSIONS)
 
     return chosen
 
@@ -270,11 +224,7 @@ def condition_to_prompt(condition_dict: dict[str, str]) -> str:
         - If you need deterministic ordering, consider sorting by axis name
         - Empty dict returns empty string
     """
-    if not condition_dict:
-        return ""
-
-    # Join values with comma separator (diffusion-friendly format)
-    return ", ".join(condition_dict.values())
+    return values_to_prompt(condition_dict)
 
 
 def get_available_axes() -> list[str]:
@@ -318,7 +268,6 @@ __all__ = [
     "AXIS_POLICY",
     "WEIGHTS",
     "EXCLUSIONS",
-    "weighted_choice",
     "generate_condition",
     "condition_to_prompt",
     "get_available_axes",

@@ -20,12 +20,12 @@ Design Philosophy:
     - "asymmetrical" → introduces irregularity signal
 
 Example usage:
-    >>> from pipeworks.core.facial_conditions import generate_facial_condition
+    >>> from pipeworks.core.condition_axis import generate_facial_condition
     >>> facial = generate_facial_condition(seed=42)
     >>> print(facial)
     {'facial_signal': 'weathered'}
 
-    >>> from pipeworks.core.facial_conditions import facial_condition_to_prompt
+    >>> from pipeworks.core.condition_axis import facial_condition_to_prompt
     >>> prompt_fragment = facial_condition_to_prompt(facial)
     >>> print(prompt_fragment)
     'weathered'
@@ -51,6 +51,8 @@ Future Integration:
 import logging
 import random
 from typing import Any
+
+from ._base import apply_exclusion_rules, values_to_prompt, weighted_choice
 
 logger = logging.getLogger(__name__)
 
@@ -126,41 +128,6 @@ FACIAL_EXCLUSIONS: dict[tuple[str, str], dict[str, list[str]]] = {
 # ============================================================================
 # GENERATOR FUNCTIONS
 # ============================================================================
-
-
-def weighted_choice(options: list[str], weights: dict[str, float] | None = None) -> str:
-    """Select a random option with optional weighted probabilities.
-
-    This is a duplicate of the weighted_choice function in character_conditions.py
-    to maintain module independence during the experimental phase. When merged,
-    this function will be deduplicated.
-
-    Args:
-        options: List of possible values to choose from
-        weights: Optional dictionary mapping options to weights.
-                If None or missing entries, defaults to uniform distribution.
-
-    Returns:
-        Randomly selected option (str)
-
-    Examples:
-        >>> # Uniform distribution
-        >>> weighted_choice(["a", "b", "c"])
-        'b'
-
-        >>> # Weighted distribution (more likely to pick "common")
-        >>> weighted_choice(["rare", "common"], {"rare": 1, "common": 5})
-        'common'
-    """
-    if not weights:
-        return random.choice(options)
-
-    # Build weight list matching option order
-    # Use weight of 1.0 for any option not in the weights dict
-    weight_values = [weights.get(option, 1.0) for option in options]
-
-    # random.choices returns a list of k elements, we want just one
-    return random.choices(options, weights=weight_values, k=1)[0]
 
 
 def generate_facial_condition(seed: int | None = None) -> dict[str, str]:
@@ -240,24 +207,7 @@ def generate_facial_condition(seed: int | None = None) -> dict[str, str]:
     # PHASE 3: Apply semantic exclusion rules
     # Currently minimal - most exclusions will be cross-system
     # ========================================================================
-    exclusions_applied = 0
-
-    for (axis, value), blocked in FACIAL_EXCLUSIONS.items():
-        # Check if this exclusion rule is triggered
-        if chosen.get(axis) == value:
-            logger.debug(f"Exclusion rule triggered: {axis}={value}")
-
-            # Check each blocked axis
-            for blocked_axis, blocked_values in blocked.items():
-                if chosen.get(blocked_axis) in blocked_values:
-                    removed_value = chosen.pop(blocked_axis)
-                    exclusions_applied += 1
-                    logger.debug(
-                        f"  Removed {blocked_axis}={removed_value} (conflicts with {axis}={value})"
-                    )
-
-    if exclusions_applied > 0:
-        logger.info(f"Applied {exclusions_applied} exclusion rule(s)")
+    apply_exclusion_rules(chosen, FACIAL_EXCLUSIONS)
 
     return chosen
 
@@ -292,12 +242,7 @@ def facial_condition_to_prompt(condition_dict: dict[str, str]) -> str:
         - Since facial_signal is mandatory, output is always a single word
         - Empty dict returns empty string (for backward compatibility only)
     """
-    if not condition_dict:
-        return ""
-
-    # Join values with comma separator (diffusion-friendly format)
-    # With current policy (max_optional=1), this will be a single value
-    return ", ".join(condition_dict.values())
+    return values_to_prompt(condition_dict)
 
 
 def get_available_facial_axes() -> list[str]:
@@ -342,7 +287,6 @@ __all__ = [
     "FACIAL_POLICY",
     "FACIAL_WEIGHTS",
     "FACIAL_EXCLUSIONS",
-    "weighted_choice",
     "generate_facial_condition",
     "facial_condition_to_prompt",
     "get_available_facial_axes",

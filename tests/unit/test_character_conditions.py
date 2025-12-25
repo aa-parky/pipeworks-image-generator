@@ -16,7 +16,7 @@ import random
 
 import pytest
 
-from pipeworks.core.character_conditions import (
+from pipeworks.core.condition_axis import (
     AXIS_POLICY,
     CONDITION_AXES,
     EXCLUSIONS,
@@ -25,8 +25,8 @@ from pipeworks.core.character_conditions import (
     generate_condition,
     get_available_axes,
     get_axis_values,
-    weighted_choice,
 )
+from pipeworks.core.condition_axis._base import weighted_choice
 
 # ============================================================================
 # Test Data Structures

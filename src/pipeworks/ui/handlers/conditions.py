@@ -71,7 +71,7 @@ def _generate_character_condition(seed: int | None = None) -> str:
         Comma-separated character condition text
         Example: "wiry, modest, old"
     """
-    from pipeworks.core.character_conditions import condition_to_prompt, generate_condition
+    from pipeworks.core.condition_axis import condition_to_prompt, generate_condition
 
     condition = generate_condition(seed=seed)
     return condition_to_prompt(condition)
@@ -87,7 +87,7 @@ def _generate_facial_condition(seed: int | None = None) -> str:
         Facial condition text (single value or empty)
         Example: "weathered" or ""
     """
-    from pipeworks.core.facial_conditions import (
+    from pipeworks.core.condition_axis import (
         facial_condition_to_prompt,
         generate_facial_condition,
     )

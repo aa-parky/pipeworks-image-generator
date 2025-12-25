@@ -20,7 +20,7 @@ import random
 
 import pytest
 
-from pipeworks.core.facial_conditions import (
+from pipeworks.core.condition_axis import (
     FACIAL_AXES,
     FACIAL_EXCLUSIONS,
     FACIAL_POLICY,
@@ -29,8 +29,8 @@ from pipeworks.core.facial_conditions import (
     generate_facial_condition,
     get_available_facial_axes,
     get_facial_axis_values,
-    weighted_choice,
 )
+from pipeworks.core.condition_axis._base import weighted_choice
 
 # ============================================================================
 # Test Data Structures
