@@ -4,7 +4,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from pipeworks.ui.handlers.prompt import build_combined_prompt
+from pipeworks.ui.handlers.prompt import (
+    build_combined_prompt,
+    get_items_in_path,
+    navigate_file_selection,
+)
 from pipeworks.ui.models import SegmentConfig, UIState
 
 
@@ -311,3 +315,106 @@ class TestAddSegmentLogic:
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         assert segments[0] == ("text", "wizard, random content")
+
+
+class TestNavigateFileSelection:
+    """Tests for navigate_file_selection() handler."""
+
+    def test_navigate_file_selection_with_file_shows_line_count(self, mock_state):
+        """Test that selecting a file displays the line count."""
+        # Mock get_file_info to return line count
+        mock_state.prompt_builder.get_file_info = Mock(
+            return_value={"line_count": 42, "exists": True}
+        )
+        mock_state.prompt_builder.get_full_path = Mock(return_value="test.txt")
+
+        dropdown_update, path, line_count_update, state = navigate_file_selection(
+            selected="test.txt", current_path="", state=mock_state
+        )
+
+        # Should call get_file_info with the full path
+        mock_state.prompt_builder.get_file_info.assert_called_once_with("test.txt")
+
+        # Line count should be visible and show the count
+        assert line_count_update["value"] == "**Lines:** 42"
+        assert line_count_update["visible"] is True
+
+    def test_navigate_file_selection_with_file_in_subfolder(self, mock_state):
+        """Test that selecting a file in a subfolder displays the line count."""
+        mock_state.prompt_builder.get_file_info = Mock(
+            return_value={"line_count": 100, "exists": True}
+        )
+        mock_state.prompt_builder.get_full_path = Mock(return_value="styles/realistic.txt")
+
+        dropdown_update, path, line_count_update, state = navigate_file_selection(
+            selected="realistic.txt", current_path="styles", state=mock_state
+        )
+
+        mock_state.prompt_builder.get_full_path.assert_called_once_with("styles", "realistic.txt")
+        mock_state.prompt_builder.get_file_info.assert_called_once_with("styles/realistic.txt")
+
+        assert line_count_update["value"] == "**Lines:** 100"
+        assert line_count_update["visible"] is True
+
+    def test_navigate_file_selection_with_nonexistent_file(self, mock_state):
+        """Test that selecting a nonexistent file shows error message."""
+        mock_state.prompt_builder.get_file_info = Mock(
+            return_value={"line_count": 0, "exists": False}
+        )
+        mock_state.prompt_builder.get_full_path = Mock(return_value="missing.txt")
+
+        dropdown_update, path, line_count_update, state = navigate_file_selection(
+            selected="missing.txt", current_path="", state=mock_state
+        )
+
+        assert line_count_update["value"] == "**File not found**"
+        assert line_count_update["visible"] is True
+
+    def test_navigate_file_selection_with_folder_hides_line_count(self, mock_state):
+        """Test that selecting a folder hides the line count display."""
+        mock_state.prompt_builder.get_items_in_path = Mock(
+            return_value=(["subfolder"], ["file.txt"])
+        )
+
+        dropdown_update, path, line_count_update, state = navigate_file_selection(
+            selected="📁 subfolder", current_path="", state=mock_state
+        )
+
+        # Line count should be hidden when navigating folders
+        assert line_count_update["visible"] is False
+
+    def test_navigate_file_selection_with_none_hides_line_count(self, mock_state):
+        """Test that selecting (None) hides the line count display."""
+        mock_state.prompt_builder.get_items_in_path = Mock(return_value=([], ["file.txt"]))
+
+        dropdown_update, path, line_count_update, state = navigate_file_selection(
+            selected="(None)", current_path="", state=mock_state
+        )
+
+        # Line count should be hidden
+        assert line_count_update["visible"] is False
+
+    def test_navigate_file_selection_with_parent_folder_hides_line_count(self, mock_state):
+        """Test that navigating up to parent folder hides line count."""
+        mock_state.prompt_builder.get_items_in_path = Mock(return_value=([], ["file.txt"]))
+
+        dropdown_update, path, line_count_update, state = navigate_file_selection(
+            selected="📁 ..", current_path="styles", state=mock_state
+        )
+
+        # Line count should be hidden when navigating
+        assert line_count_update["visible"] is False
+
+    def test_get_items_in_path_hides_line_count(self, mock_state):
+        """Test that get_items_in_path always hides line count."""
+        mock_state.prompt_builder.get_items_in_path = Mock(
+            return_value=(["folder"], ["file1.txt", "file2.txt"])
+        )
+
+        dropdown_update, display_path, line_count_update, state = get_items_in_path(
+            current_path="", state=mock_state
+        )
+
+        # Line count should be hidden when browsing
+        assert line_count_update["visible"] is False
+        assert line_count_update["value"] == ""

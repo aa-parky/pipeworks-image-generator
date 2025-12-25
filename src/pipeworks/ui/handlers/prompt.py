@@ -13,7 +13,9 @@ from ..validation import ValidationError
 logger = logging.getLogger(__name__)
 
 
-def get_items_in_path(current_path: str, state: UIState) -> tuple[dict[str, Any], str, UIState]:
+def get_items_in_path(
+    current_path: str, state: UIState
+) -> tuple[dict[str, Any], str, dict[str, Any], UIState]:
     """Get folders and files at the current path level.
 
     Args:
@@ -21,14 +23,14 @@ def get_items_in_path(current_path: str, state: UIState) -> tuple[dict[str, Any]
         state: UI state (contains prompt_builder)
 
     Returns:
-        Tuple of (updated_dropdown, display_path, updated_state)
+        Tuple of (updated_dropdown, display_path, line_count_update, updated_state)
     """
     # Initialize state if needed
     state = initialize_ui_state(state)
 
     # Check if prompt_builder is available
     if state.prompt_builder is None:
-        return gr.update(), current_path, state
+        return gr.update(), current_path, gr.update(), state
 
     folders, files = state.prompt_builder.get_items_in_path(current_path)
 
@@ -49,12 +51,15 @@ def get_items_in_path(current_path: str, state: UIState) -> tuple[dict[str, Any]
     # Display path for user reference
     display_path = f"/{current_path}" if current_path else "/inputs"
 
-    return gr.update(choices=choices, value="(None)"), display_path, state
+    # Hide line count when browsing folders
+    line_count_update = gr.update(value="", visible=False)
+
+    return gr.update(choices=choices, value="(None)"), display_path, line_count_update, state
 
 
 def navigate_file_selection(
     selected: str, current_path: str, state: UIState
-) -> tuple[dict[str, Any], str, UIState]:
+) -> tuple[dict[str, Any], str, dict[str, Any], UIState]:
     """Handle folder navigation when an item is selected.
 
     Args:
@@ -63,12 +68,15 @@ def navigate_file_selection(
         state: UI state
 
     Returns:
-        Tuple of (updated_dropdown, new_path, updated_state)
+        Tuple of (updated_dropdown, new_path, line_count_update, updated_state)
     """
+    # Initialize state if needed
+    state = initialize_ui_state(state)
+
     # If (None) selected, do nothing
     if selected == "(None)":
-        dropdown, display, state = get_items_in_path(current_path, state)
-        return dropdown, current_path, state
+        dropdown, display, line_count, state = get_items_in_path(current_path, state)
+        return dropdown, current_path, line_count, state
 
     # Check if it's a folder (starts with folder emoji)
     if selected.startswith("📁 "):
@@ -87,11 +95,27 @@ def navigate_file_selection(
             new_path = str(Path(current_path) / folder_name) if current_path else folder_name
 
         # Update dropdown with new path contents
-        dropdown, display, state = get_items_in_path(new_path, state)
-        return dropdown, new_path, state
+        dropdown, display, line_count, state = get_items_in_path(new_path, state)
+        return dropdown, new_path, line_count, state
     else:
-        # It's a file - keep it selected but don't navigate
-        return gr.update(), current_path, state
+        # It's a file - display line count
+        if state.prompt_builder is None:
+            return gr.update(), current_path, gr.update(), state
+
+        # Get full path to the file
+        full_path = state.prompt_builder.get_full_path(current_path, selected)
+
+        # Get file info (includes line count)
+        file_info = state.prompt_builder.get_file_info(full_path)
+
+        if file_info["exists"]:
+            line_count = file_info["line_count"]
+            line_count_text = f"**Lines:** {line_count}"
+            line_count_update = gr.update(value=line_count_text, visible=True)
+        else:
+            line_count_update = gr.update(value="**File not found**", visible=True)
+
+        return gr.update(), current_path, line_count_update, state
 
 
 def build_combined_prompt(

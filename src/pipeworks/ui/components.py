@@ -53,6 +53,9 @@ class SegmentUI:
                 label="File/Folder Browser", choices=initial_choices, value="(None)"
             )
 
+            # Line count display (shown when a file is selected)
+            self.line_count_display = gr.Markdown(value="", visible=False)
+
             # Hidden state to track current navigation path
             self.path_state = gr.State(value="")
 
@@ -109,6 +112,7 @@ class SegmentUI:
             self.text,
             self.path_display,
             self.file,
+            self.line_count_display,
             self.path_state,
             self.mode,
             self.dynamic,
@@ -146,15 +150,17 @@ class SegmentUI:
         Returns:
             List of components that can be updated by handlers
         """
-        return [self.title, self.path_display, self.file, self.path_state]
+        return [self.title, self.path_display, self.file, self.line_count_display, self.path_state]
 
-    def get_navigation_components(self) -> tuple[gr.Dropdown, gr.State, gr.Textbox]:
+    def get_navigation_components(
+        self,
+    ) -> tuple[gr.Dropdown, gr.State, gr.Textbox, gr.Markdown]:
         """Return components needed for file browser navigation.
 
         Returns:
-            Tuple of (file_dropdown, path_state, path_display)
+            Tuple of (file_dropdown, path_state, path_display, line_count_display)
         """
-        return self.file, self.path_state, self.path_display
+        return self.file, self.path_state, self.path_display, self.line_count_display
 
     def get_mode_visibility_outputs(
         self,
@@ -361,6 +367,9 @@ class ConditionSegmentUI(SegmentUI):
             self.file = gr.Dropdown(
                 label="File/Folder Browser", choices=initial_choices, value="(None)"
             )
+
+            # Line count display (shown when a file is selected)
+            self.line_count_display = gr.Markdown(value="", visible=False)
 
             # Hidden state to track current navigation path
             self.path_state = gr.State(value="")

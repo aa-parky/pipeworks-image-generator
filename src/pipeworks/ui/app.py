@@ -399,12 +399,14 @@ def create_generation_tab(ui_state):
     # Event handlers
     # File browser navigation for all nine segments
     for segment in [start_1, start_2, start_3, mid_1, mid_2, mid_3, end_1, end_2, end_3]:
-        file_dropdown, path_state, path_display = segment.get_navigation_components()
+        file_dropdown, path_state, path_display, line_count_display = (
+            segment.get_navigation_components()
+        )
 
         file_dropdown.change(
             fn=navigate_file_selection,
             inputs=[file_dropdown, path_state, ui_state],
-            outputs=[file_dropdown, path_state, ui_state],
+            outputs=[file_dropdown, path_state, line_count_display, ui_state],
         ).then(
             fn=lambda path: f"/{path}" if path else "/inputs",
             inputs=[path_state],
