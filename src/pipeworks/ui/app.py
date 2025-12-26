@@ -9,8 +9,6 @@ from pipeworks.core.config import config
 from pipeworks.plugins.base import plugin_registry
 
 from .components import (
-    ConditionSegmentUI,
-    SegmentUI,
     update_mode_visibility,
 )
 from .handlers import (
@@ -193,12 +191,14 @@ def create_generation_tab(ui_state):
                     value="A serene mountain landscape at sunset with vibrant colors",
                 )
 
-            # Prompt Builder
+            # Prompt Builder (Refactored to use dynamic segment plugin system)
             with gr.Accordion("Prompt Builder", open=False):
                 gr.Markdown(
                     "*Build prompts by combining text and random lines from files "
                     "in the `inputs/` directory*\n\n"
-                    "*Click folders (📁) to navigate, select files to use*"
+                    "*Click folders (📁) to navigate, select files to use*\n\n"
+                    "**Add 1-10 segments as needed. Each segment supports text, "
+                    "files, and conditions.**"
                 )
 
                 # Initialize file browser choices
@@ -214,28 +214,41 @@ def create_generation_tab(ui_state):
                 except Exception as e:
                     logger.error(f"Error initializing file browser: {e}")
 
-                # Row 1: Start segments
-                gr.Markdown("**Start Segments**")
-                with gr.Row():
-                    # Start 1 is a regular segment (no conditions)
-                    start_1 = SegmentUI("Start 1", initial_choices)
-                    # Start 2 and Start 3 have condition generation support
-                    start_2 = ConditionSegmentUI("Start 2", initial_choices)
-                    start_3 = ConditionSegmentUI("Start 3", initial_choices)
+                # Create dynamic segments using CompleteSegmentPlugin
+                # We create 10 segments upfront (max capacity) and control visibility
+                from pipeworks.ui.segment_plugins import CompleteSegmentPlugin
 
-                # Row 2: Mid segments
-                gr.Markdown("**Mid Segments**")
-                with gr.Row():
-                    mid_1 = SegmentUI("Mid 1", initial_choices)
-                    mid_2 = SegmentUI("Mid 2", initial_choices)
-                    mid_3 = SegmentUI("Mid 3", initial_choices)
+                plugin = CompleteSegmentPlugin()
+                segments = []
 
-                # Row 3: End segments
-                gr.Markdown("**End Segments**")
+                gr.Markdown("**Prompt Segments**")
+
+                # Create all 10 segments upfront (visibility controlled by state)
+                for i in range(10):
+                    segment = plugin.create_ui(str(i), initial_choices)
+                    segments.append(segment)
+                    # Hide segments 1-9 initially (only show segment 0)
+                    if i > 0:
+                        segment.container.visible = False
+
+                # Segment manager controls
                 with gr.Row():
-                    end_1 = SegmentUI("End 1", initial_choices)
-                    end_2 = SegmentUI("End 2", initial_choices)
-                    end_3 = SegmentUI("End 3", initial_choices)
+                    add_segment_btn = gr.Button("➕ Add Segment", variant="secondary", size="sm")
+                    remove_segment_btn = gr.Button(
+                        "➖ Remove Last Segment", variant="secondary", size="sm"
+                    )
+
+                segment_status = gr.Markdown("**Total: 1 segment(s)**")
+
+                # Segment manager state (tracks visible segments)
+                segment_manager_state = gr.State(
+                    {
+                        "segments": [segments[0]],  # Only segment 0 visible initially
+                        "next_segment_id": 1,
+                        "max_segments": 10,
+                        "min_segments": 1,
+                    }
+                )
 
                 # Build Button
                 build_prompt_btn = gr.Button("Build Prompt", variant="secondary")
@@ -396,38 +409,11 @@ def create_generation_tab(ui_state):
         """
     )
 
-    # Event handlers
-    # File browser navigation for all nine segments
-    for segment in [start_1, start_2, start_3, mid_1, mid_2, mid_3, end_1, end_2, end_3]:
-        file_dropdown, path_state, path_display, line_count_display = (
-            segment.get_navigation_components()
-        )
-
-        file_dropdown.change(
-            fn=navigate_file_selection,
-            inputs=[file_dropdown, path_state, ui_state],
-            outputs=[file_dropdown, path_state, line_count_display, ui_state],
-        ).then(
-            fn=lambda path: f"/{path}" if path else "/inputs",
-            inputs=[path_state],
-            outputs=[path_display],
-        )
-
-    # Mode visibility handlers for all nine segments
-    for segment in [start_1, start_2, start_3, mid_1, mid_2, mid_3, end_1, end_2, end_3]:
-        mode_dropdown = segment.mode
-        line, range_end, count, sequential_start_line = segment.get_mode_visibility_outputs()
-
-        mode_dropdown.change(
-            fn=update_mode_visibility,
-            inputs=[mode_dropdown],
-            outputs=[line, range_end, count, sequential_start_line],
-        )
-
     # =========================================================================
-    # Condition generation handlers (Start 2 and Start 3)
+    # Event handlers for dynamic segments
     # =========================================================================
 
+    # Condition generation helper functions (used by all segments)
     def toggle_condition_type_handler(condition_type: str) -> tuple[str, dict[str, Any]]:
         """Show/hide condition controls and generate initial condition.
 
@@ -465,210 +451,210 @@ def create_generation_tab(ui_state):
         # Always use random seed for variety
         return generate_condition_by_type(condition_type, seed=None)
 
-    # Wire up condition generation for Start 2
-    (
-        condition_type_2,
-        condition_text_2,
-        condition_regenerate_2,
-        condition_dynamic_2,
-        condition_controls_2,
-    ) = start_2.get_condition_components()
+    # Wire up event handlers for all 10 segments
+    event_handlers = {
+        "navigate_file_selection": navigate_file_selection,
+        "update_mode_visibility": update_mode_visibility,
+        "toggle_condition_type": toggle_condition_type_handler,
+        "regenerate_condition": regenerate_condition_type_handler,
+    }
 
-    # Dropdown change: show/hide controls and generate initial condition
-    condition_type_2.change(
-        fn=toggle_condition_type_handler,
-        inputs=[condition_type_2],
-        outputs=[condition_text_2, condition_controls_2],
+    for segment in segments:
+        plugin.register_events(segment, ui_state, event_handlers)
+
+    # =========================================================================
+    # Segment management button handlers (add/remove)
+    # =========================================================================
+
+    def add_segment_click_handler(
+        segment_manager_state_value: dict[str, Any], ui_state_value: UIState
+    ) -> tuple[dict[str, Any], str, list[dict[str, Any]], UIState]:
+        """Add a new segment when the Add button is clicked.
+
+        Args:
+            segment_manager_state_value: Current segment manager state
+            ui_state_value: Current UI state
+
+        Returns:
+            Tuple of (updated_segment_manager_state, status_message,
+                     visibility_updates, updated_ui_state)
+        """
+        from pipeworks.ui.handlers.segments import add_segment_handler, can_add_segment
+
+        # Check if we can add
+        if not can_add_segment(segment_manager_state_value):
+            max_segments = segment_manager_state_value.get("max_segments", 10)
+            return (
+                segment_manager_state_value,
+                f"**Total: {len(segment_manager_state_value.get('segments', []))} segment(s)** "
+                f"(Maximum {max_segments} reached)",
+                [gr.update() for _ in range(10)],  # No visibility changes
+                ui_state_value,
+            )
+
+        # Add segment (updates state bookkeeping)
+        updated_state, message, updated_ui_state = add_segment_handler(
+            segment_manager_state_value, ui_state_value
+        )
+
+        # Make the next segment visible
+        next_visible_index = len(updated_state["segments"])
+        visibility_updates = [gr.update(visible=(i <= next_visible_index)) for i in range(10)]
+
+        # Update segment list to include the new segment
+        updated_state["segments"] = updated_state["segments"] + [segments[next_visible_index]]
+
+        # Update status message
+        count = len(updated_state["segments"])
+        status = f"**Total: {count} segment(s)**"
+
+        return updated_state, status, visibility_updates, updated_ui_state
+
+    def remove_segment_click_handler(
+        segment_manager_state_value: dict[str, Any], ui_state_value: UIState
+    ) -> tuple[dict[str, Any], str, list[dict[str, Any]], UIState]:
+        """Remove the last segment when the Remove button is clicked.
+
+        Args:
+            segment_manager_state_value: Current segment manager state
+            ui_state_value: Current UI state
+
+        Returns:
+            Tuple of (updated_segment_manager_state, status_message,
+                     visibility_updates, updated_ui_state)
+        """
+        from pipeworks.ui.handlers.segments import can_remove_segment, get_segment_count
+
+        # Check if we can remove
+        if not can_remove_segment(segment_manager_state_value):
+            min_segments = segment_manager_state_value.get("min_segments", 1)
+            return (
+                segment_manager_state_value,
+                f"**Total: {len(segment_manager_state_value.get('segments', []))} segment(s)** "
+                f"(Minimum {min_segments} required)",
+                [gr.update() for _ in range(10)],  # No visibility changes
+                ui_state_value,
+            )
+
+        # Remove last segment from state
+        current_count = get_segment_count(segment_manager_state_value)
+        updated_segments = segment_manager_state_value["segments"][:-1]
+
+        updated_state = {
+            "segments": updated_segments,
+            "next_segment_id": segment_manager_state_value.get("next_segment_id", 0),
+            "max_segments": segment_manager_state_value.get("max_segments", 10),
+            "min_segments": segment_manager_state_value.get("min_segments", 1),
+        }
+
+        # Hide the last segment
+        visibility_updates = [gr.update(visible=(i < current_count - 1)) for i in range(10)]
+
+        # Update status message
+        count = len(updated_segments)
+        status = f"**Total: {count} segment(s)**"
+
+        return updated_state, status, visibility_updates, ui_state_value
+
+    # Wire up add/remove button handlers
+    add_segment_btn.click(
+        fn=add_segment_click_handler,
+        inputs=[segment_manager_state, ui_state],
+        outputs=[
+            segment_manager_state,
+            segment_status,
+            *[seg.container for seg in segments],  # Update visibility for all 10 segments
+            ui_state,
+        ],
     )
 
-    # Regenerate button: create new random condition
-    condition_regenerate_2.click(
-        fn=regenerate_condition_type_handler,
-        inputs=[condition_type_2],
-        outputs=[condition_text_2],
+    remove_segment_btn.click(
+        fn=remove_segment_click_handler,
+        inputs=[segment_manager_state, ui_state],
+        outputs=[
+            segment_manager_state,
+            segment_status,
+            *[seg.container for seg in segments],  # Update visibility for all 10 segments
+            ui_state,
+        ],
     )
 
-    # Wire up condition generation for Start 3
-    (
-        condition_type_3,
-        condition_text_3,
-        condition_regenerate_3,
-        condition_dynamic_3,
-        condition_controls_3,
-    ) = start_3.get_condition_components()
-
-    # Dropdown change: show/hide controls and generate initial condition
-    condition_type_3.change(
-        fn=toggle_condition_type_handler,
-        inputs=[condition_type_3],
-        outputs=[condition_text_3, condition_controls_3],
-    )
-
-    # Regenerate button: create new random condition
-    condition_regenerate_3.click(
-        fn=regenerate_condition_type_handler,
-        inputs=[condition_type_3],
-        outputs=[condition_text_3],
-    )
-
-    # Build prompt button handler
+    # Build prompt button handler (refactored for dynamic segments)
     def build_and_update_prompt(*values):
         """Build prompt from segment values and update UI.
 
-        Now includes condition text concatenation for Start 2 and Start 3.
+        Now works with variable number of segments (1-10) using CompleteSegmentPlugin.
+
+        Args:
+            *values: Variable number of values:
+                - segment_manager_state (dict)
+                - All 10 segments' input values (14 values each: 11 segment + 3 condition)
+                - ui_state
+
+        Returns:
+            Tuple of (prompt, *segment_title_updates, ui_state)
         """
-        # Split values into segment groups
-        # (11 values each: text, path, file, mode, line, range_end, count, dynamic,
-        # sequential_start_line, text_order, delimiter)
-        start_1_values = list(values[0:11])
+        # Extract segment_manager_state and ui_state
+        segment_manager_state_val = values[0]
+        ui_state_val = values[-1]
 
-        # Start 2 with conditions (3 condition values + 11 segment values)
-        condition_type_2_val = values[11]
-        condition_text_2_val = values[12]
-        # Skip condition_dynamic_2 (index 13) - only used during generation, not preview
-        start_2_values = list(values[14:25])
+        # Extract values for all 10 segments (14 values each)
+        # Values order: segment_manager_state, seg0[14], seg1[14], ..., seg9[14], ui_state
+        segment_values_list = []
+        start_idx = 1  # Skip segment_manager_state
+        for i in range(10):
+            seg_vals = values[start_idx : start_idx + 14]
+            segment_values_list.append(seg_vals)
+            start_idx += 14
 
-        # Start 3 with conditions (3 condition values + 11 segment values)
-        condition_type_3_val = values[25]
-        condition_text_3_val = values[26]
-        # Skip condition_dynamic_3 (index 27) - only used during generation, not preview
-        start_3_values = list(values[28:39])
+        # Get number of visible segments
+        visible_count = len(segment_manager_state_val.get("segments", []))
 
-        # Remaining segments
-        mid_1_values = values[39:50]
-        mid_2_values = values[50:61]
-        mid_3_values = values[61:72]
-        end_1_values = values[72:83]
-        end_2_values = values[83:94]
-        end_3_values = values[94:105]
-        state = values[105]
-
-        # Concatenate condition text with Start 2 text if condition is enabled
-        # Show the condition in the prompt preview (even if dynamic - it will be
-        # regenerated during generation)
-        if condition_type_2_val != "None" and condition_text_2_val:
-            # Condition text comes first, then user text (if any)
-            original_text = start_2_values[0]  # First value is text
-            if original_text and original_text.strip():
-                start_2_values[0] = f"{condition_text_2_val}, {original_text}"
-            else:
-                start_2_values[0] = condition_text_2_val
-
-        # Concatenate condition text with Start 3 text if condition is enabled
-        if condition_type_3_val != "None" and condition_text_3_val:
-            # Condition text comes first, then user text (if any)
-            original_text = start_3_values[0]  # First value is text
-            if original_text and original_text.strip():
-                start_3_values[0] = f"{condition_text_3_val}, {original_text}"
-            else:
-                start_3_values[0] = condition_text_3_val
-
-        # Convert to SegmentConfig objects
-        start_1_cfg = SegmentUI.values_to_config(*start_1_values)
-        start_2_cfg = SegmentUI.values_to_config(*start_2_values)
-        start_3_cfg = SegmentUI.values_to_config(*start_3_values)
-        mid_1_cfg = SegmentUI.values_to_config(*mid_1_values)
-        mid_2_cfg = SegmentUI.values_to_config(*mid_2_values)
-        mid_3_cfg = SegmentUI.values_to_config(*mid_3_values)
-        end_1_cfg = SegmentUI.values_to_config(*end_1_values)
-        end_2_cfg = SegmentUI.values_to_config(*end_2_values)
-        end_3_cfg = SegmentUI.values_to_config(*end_3_values)
+        # Convert visible segments to SegmentConfig objects
+        segment_configs = []
+        for i in range(visible_count):
+            segment_configs.append(plugin.values_to_config(*segment_values_list[i]))
 
         # Initialize state
-        state = initialize_ui_state(state)
+        ui_state_val = initialize_ui_state(ui_state_val)
 
-        # Build prompt
+        # Build prompt using refactored handler (accepts list[SegmentConfig])
         try:
             prompt = build_combined_prompt(
-                start_1_cfg,
-                start_2_cfg,
-                start_3_cfg,
-                mid_1_cfg,
-                mid_2_cfg,
-                mid_3_cfg,
-                end_1_cfg,
-                end_2_cfg,
-                end_3_cfg,
-                state,
+                segment_configs,  # Pass list directly
+                ui_state_val,
             )
         except ValidationError as e:
             prompt = f"Error: {str(e)}"
 
-        # Update titles with status
-        start_1_title = SegmentUI.format_title(
-            "Start 1", start_1_cfg.file, start_1_cfg.mode, start_1_cfg.dynamic
-        )
-        start_2_title = SegmentUI.format_title(
-            "Start 2", start_2_cfg.file, start_2_cfg.mode, start_2_cfg.dynamic
-        )
-        start_3_title = SegmentUI.format_title(
-            "Start 3", start_3_cfg.file, start_3_cfg.mode, start_3_cfg.dynamic
-        )
-        mid_1_title = SegmentUI.format_title(
-            "Mid 1", mid_1_cfg.file, mid_1_cfg.mode, mid_1_cfg.dynamic
-        )
-        mid_2_title = SegmentUI.format_title(
-            "Mid 2", mid_2_cfg.file, mid_2_cfg.mode, mid_2_cfg.dynamic
-        )
-        mid_3_title = SegmentUI.format_title(
-            "Mid 3", mid_3_cfg.file, mid_3_cfg.mode, mid_3_cfg.dynamic
-        )
-        end_1_title = SegmentUI.format_title(
-            "End 1", end_1_cfg.file, end_1_cfg.mode, end_1_cfg.dynamic
-        )
-        end_2_title = SegmentUI.format_title(
-            "End 2", end_2_cfg.file, end_2_cfg.mode, end_2_cfg.dynamic
-        )
-        end_3_title = SegmentUI.format_title(
-            "End 3", end_3_cfg.file, end_3_cfg.mode, end_3_cfg.dynamic
-        )
+        # Update titles for all 10 segments (only visible ones will show)
+        segment_titles = []
+        for i in range(10):
+            if i < visible_count:
+                cfg = segment_configs[i]
+                title = f"**Segment {i}**"
+                if cfg.file and cfg.file != "(None)":
+                    title += f" • 📄 {cfg.file}"
+                if cfg.dynamic:
+                    title += " • 🔄 Dynamic"
+                segment_titles.append(title)
+            else:
+                segment_titles.append(f"**Segment {i}**")  # Default title for hidden segments
 
-        return (
-            prompt,
-            start_1_title,
-            start_2_title,
-            start_3_title,
-            mid_1_title,
-            mid_2_title,
-            mid_3_title,
-            end_1_title,
-            end_2_title,
-            end_3_title,
-            state,
-        )
+        return (prompt, *segment_titles, ui_state_val)
 
-    # Collect all segment inputs
-    # NOTE: Start 2 and Start 3 condition components are interspersed with their segment inputs
-    # (condition components already extracted above for handlers)
-    all_segment_inputs = (
-        start_1.get_input_components()  # Start 1 (no conditions)
-        + [condition_type_2, condition_text_2, condition_dynamic_2]  # Condition inputs for Start 2
-        + start_2.get_input_components()
-        + [condition_type_3, condition_text_3, condition_dynamic_3]  # Condition inputs for Start 3
-        + start_3.get_input_components()
-        + mid_1.get_input_components()
-        + mid_2.get_input_components()
-        + mid_3.get_input_components()
-        + end_1.get_input_components()
-        + end_2.get_input_components()
-        + end_3.get_input_components()
-        + [ui_state]
-    )
+    # Collect inputs: segment_manager_state + all 10 segments' inputs + ui_state
+    all_segment_inputs = [segment_manager_state]
+    for segment in segments:
+        all_segment_inputs.extend(plugin.get_input_components(segment))
+    all_segment_inputs.append(ui_state)
 
     build_prompt_btn.click(
         fn=build_and_update_prompt,
         inputs=all_segment_inputs,
         outputs=[
             prompt_input,
-            start_1.title,
-            start_2.title,
-            start_3.title,
-            mid_1.title,
-            mid_2.title,
-            mid_3.title,
-            end_1.title,
-            end_2.title,
-            end_3.title,
+            *[seg.title for seg in segments],  # All 10 segment titles
             ui_state,
         ],
     )
@@ -687,13 +673,13 @@ def create_generation_tab(ui_state):
         outputs=[tokenizer_output, ui_state],
     )
 
-    # Generate button handler
+    # Generate button handler (refactored for dynamic segments)
     def generate_wrapper(*values):
         """Wrapper to convert segment values to SegmentConfig objects.
 
-        Now includes condition text concatenation for Start 2 and Start 3.
+        Now works with variable number of segments (1-10) using CompleteSegmentPlugin.
         """
-        # Extract values - includes image editing inputs (3 images + instruction)
+        # Extract image editing inputs and generation params
         input_img_1 = values[0]
         input_img_2 = values[1]
         input_img_3 = values[2]
@@ -707,68 +693,31 @@ def create_generation_tab(ui_state):
         seed = values[10]
         use_random_seed = values[11]
 
-        # Segment values
-        # (11 values each: text, path, file, mode, line, range_end, count, dynamic,
-        # sequential_start_line, text_order, delimiter)
-        # Start 1 (no conditions)
-        start_1_values = list(values[12:23])
+        # Extract segment_manager_state and ui_state
+        segment_manager_state_val = values[12]
+        ui_state_val = values[-1]
 
-        # Start 2 with conditions (3 condition values + 11 segment values)
-        condition_type_2_val = values[23]
-        condition_text_2_val = values[24]
-        condition_dynamic_2_val = values[25]
-        start_2_values = list(values[26:37])
+        # Extract values for all 10 segments (14 values each)
+        # Values order: [gen params], segment_manager_state, seg0[14], ..., seg9[14], ui_state
+        segment_values_list = []
+        start_idx = 13  # Skip gen params + segment_manager_state
+        for i in range(10):
+            seg_vals = values[start_idx : start_idx + 14]
+            segment_values_list.append(seg_vals)
+            start_idx += 14
 
-        # Start 3 with conditions (3 condition values + 11 segment values)
-        condition_type_3_val = values[37]
-        condition_text_3_val = values[38]
-        condition_dynamic_3_val = values[39]
-        start_3_values = list(values[40:51])
+        # Get number of visible segments
+        visible_count = len(segment_manager_state_val.get("segments", []))
 
-        # Remaining segments
-        mid_1_values = values[51:62]
-        mid_2_values = values[62:73]
-        mid_3_values = values[73:84]
-        end_1_values = values[84:95]
-        end_2_values = values[95:106]
-        end_3_values = values[106:117]
-        state = values[117]
-
-        # Concatenate condition text with Start 2 text if condition is enabled
-        # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
-        if condition_type_2_val != "None" and condition_text_2_val and not condition_dynamic_2_val:
-            # Condition text comes first, then user text (if any)
-            original_text = start_2_values[0]  # First value is text
-            if original_text and original_text.strip():
-                start_2_values[0] = f"{condition_text_2_val}, {original_text}"
-            else:
-                start_2_values[0] = condition_text_2_val
-
-        # Concatenate condition text with Start 3 text if condition is enabled
-        # BUT only if NOT dynamic (dynamic conditions are regenerated per-run inside generate_image)
-        if condition_type_3_val != "None" and condition_text_3_val and not condition_dynamic_3_val:
-            # Condition text comes first, then user text (if any)
-            original_text = start_3_values[0]  # First value is text
-            if original_text and original_text.strip():
-                start_3_values[0] = f"{condition_text_3_val}, {original_text}"
-            else:
-                start_3_values[0] = condition_text_3_val
-
-        # Convert to SegmentConfig objects
-        start_1_cfg = SegmentUI.values_to_config(*start_1_values)
-        start_2_cfg = SegmentUI.values_to_config(*start_2_values)
-        start_3_cfg = SegmentUI.values_to_config(*start_3_values)
-        mid_1_cfg = SegmentUI.values_to_config(*mid_1_values)
-        mid_2_cfg = SegmentUI.values_to_config(*mid_2_values)
-        mid_3_cfg = SegmentUI.values_to_config(*mid_3_values)
-        end_1_cfg = SegmentUI.values_to_config(*end_1_values)
-        end_2_cfg = SegmentUI.values_to_config(*end_2_values)
-        end_3_cfg = SegmentUI.values_to_config(*end_3_values)
+        # Convert visible segments to SegmentConfig objects using CompleteSegmentPlugin
+        segment_configs = []
+        for i in range(visible_count):
+            segment_configs.append(plugin.values_to_config(*segment_values_list[i]))
 
         # Collect input images (filter out None values)
         input_images = [img for img in [input_img_1, input_img_2, input_img_3] if img is not None]
 
-        # Call generate_image with clean parameters (includes image editing params and conditions)
+        # Call generate_image with refactored signature (accepts list[SegmentConfig])
         return generate_image(
             prompt,
             width,
@@ -778,29 +727,13 @@ def create_generation_tab(ui_state):
             runs,
             seed,
             use_random_seed,
-            start_1_cfg,
-            start_2_cfg,
-            start_3_cfg,
-            mid_1_cfg,
-            mid_2_cfg,
-            mid_3_cfg,
-            end_1_cfg,
-            end_2_cfg,
-            end_3_cfg,
-            state,
+            segment_configs,  # Pass list directly
+            ui_state_val,
             input_images=input_images if input_images else None,
             instruction=instruction,
-            # Condition parameters for Start 2
-            condition_type_2=condition_type_2_val,
-            condition_text_2=condition_text_2_val,
-            condition_dynamic_2=condition_dynamic_2_val,
-            # Condition parameters for Start 3
-            condition_type_3=condition_type_3_val,
-            condition_text_3=condition_text_3_val,
-            condition_dynamic_3=condition_dynamic_3_val,
         )
 
-    # Collect all inputs for generation (includes image editing inputs)
+    # Collect all inputs for generation (includes image editing inputs + segments)
     generation_inputs = [
         input_image_1,
         input_image_2,
@@ -814,7 +747,7 @@ def create_generation_tab(ui_state):
         runs_input,
         seed_input,
         random_seed_checkbox,
-    ] + all_segment_inputs
+    ] + all_segment_inputs  # Includes segment_manager_state + all 10 segments + ui_state
 
     generate_btn.click(
         fn=generate_wrapper,

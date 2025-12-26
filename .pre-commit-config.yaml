@@ -46,13 +46,27 @@ repos:
         files: ^src/pipeworks/ui/
 
   # Run tests before commit (prevents committing broken code)
-  # Note: Only runs fast unit tests to avoid timeout. Run full suite manually with: pytest
+  # Note: Only runs fast core logic tests (models, validation, segments).
+  # Excludes test_prompt_handlers.py (slow due to file I/O).
+  # Run full suite manually with: pytest
+  # Full suite runs automatically in CI
   - repo: local
     hooks:
       - id: pytest-check
         name: pytest
         entry: pytest
-        args: [tests/unit/, --tb=short, --no-cov, -q, --maxfail=5, -m, "not requires_model and not slow"]
+        args: [
+          tests/unit/test_models.py,
+          tests/unit/test_validation.py,
+          tests/unit/test_segment_plugins.py,
+          tests/unit/test_complete_segment_plugin.py,
+          tests/unit/test_segment_state.py,
+          --tb=short,
+          --no-cov,
+          -q,
+          --maxfail=3,
+          -x
+        ]
         language: system
         pass_filenames: false
         types: [python]

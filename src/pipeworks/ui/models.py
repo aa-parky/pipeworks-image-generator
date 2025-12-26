@@ -124,6 +124,37 @@ class GenerationParams:
 
 
 @dataclass
+class SegmentManagerState:
+    """State for dynamic segment management in the prompt builder.
+
+    This manages the collection of segments that users can dynamically add/remove
+    in the prompt builder UI. Segments are stored as SegmentUIComponents instances.
+
+    Attributes
+    ----------
+    segments : list[Any]
+        List of SegmentUIComponents instances (typed as Any to avoid circular import)
+    next_segment_id : int
+        Counter for generating unique segment IDs (0, 1, 2, ...)
+    max_segments : int
+        Maximum number of segments allowed (default: 10)
+    min_segments : int
+        Minimum number of segments required (default: 1)
+
+    Notes
+    -----
+    - Segments are identified by string IDs ("0", "1", "2", etc.)
+    - The next_segment_id counter increments even when segments are removed
+    - This ensures unique IDs across the session lifecycle
+    """
+
+    segments: list[Any] = field(default_factory=list)  # List[SegmentUIComponents]
+    next_segment_id: int = 0
+    max_segments: int = 10
+    min_segments: int = 1
+
+
+@dataclass
 class UIState:
     """Session state for the Gradio UI.
 
@@ -149,6 +180,8 @@ class UIState:
         FavoritesDB instance for tracking favorites
     catalog_manager : Any | None
         CatalogManager instance for archiving favorites
+    segment_manager : SegmentManagerState
+        State for dynamic segment management
     """
 
     # Model adapter
@@ -172,6 +205,9 @@ class UIState:
     catalog_manager: Any | None = None  # CatalogManager instance
     gallery_filter: str = "all"  # "all" or "favorites"
     gallery_root: str = "outputs"  # Current root: "outputs" or "catalog"
+
+    # Segment management state
+    segment_manager: SegmentManagerState = field(default_factory=SegmentManagerState)
 
     def is_initialized(self) -> bool:
         """Check if the state has been initialized with core components.

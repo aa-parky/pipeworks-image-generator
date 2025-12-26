@@ -348,8 +348,6 @@ class TestEdgeCases:
         assert result == "prefix line1,line2,"
 
         # Test All Lines - delimiter used within file lines AND at end
-        cfg = SegmentConfig(
-            text="prefix", file="test.txt", mode="All Lines", delimiter="Comma (,)"
-        )
+        cfg = SegmentConfig(text="prefix", file="test.txt", mode="All Lines", delimiter="Comma (,)")
         result = build_combined_prompt(cfg, *empty_segments[1:], state=initialized_state)
         assert result == "prefix line1,line2,line3,"

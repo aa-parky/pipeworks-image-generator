@@ -119,35 +119,23 @@ def navigate_file_selection(
 
 
 def build_combined_prompt(
-    start_1: SegmentConfig,
-    start_2: SegmentConfig,
-    start_3: SegmentConfig,
-    mid_1: SegmentConfig,
-    mid_2: SegmentConfig,
-    mid_3: SegmentConfig,
-    end_1: SegmentConfig,
-    end_2: SegmentConfig,
-    end_3: SegmentConfig,
+    segment_configs: list[SegmentConfig],
     state: UIState,
     run_index: int = 0,
 ) -> str:
     """Build a combined prompt from multiple segments.
 
     Args:
-        start_1: Start segment 1 configuration
-        start_2: Start segment 2 configuration
-        start_3: Start segment 3 configuration
-        mid_1: Mid segment 1 configuration
-        mid_2: Mid segment 2 configuration
-        mid_3: Mid segment 3 configuration
-        end_1: End segment 1 configuration
-        end_2: End segment 2 configuration
-        end_3: End segment 3 configuration
+        segment_configs: List of segment configurations (1-10 segments)
         state: UI state (contains prompt_builder)
         run_index: Zero-indexed run number (for Sequential mode)
 
     Returns:
         Combined prompt string or error message
+
+    Notes:
+        Supports variable number of segments (1-10). Each segment can have
+        text, file content, and optional character/facial conditions.
     """
     # Initialize state if needed
     state = initialize_ui_state(state)
@@ -279,16 +267,9 @@ def build_combined_prompt(
             combined_with_end_delimiter = combined + delimiter_value
             segments.append(("text", combined_with_end_delimiter))
 
-    # Add segments in order (Start 1-3, Mid 1-3, End 1-3)
-    add_segment(start_1)
-    add_segment(start_2)
-    add_segment(start_3)
-    add_segment(mid_1)
-    add_segment(mid_2)
-    add_segment(mid_3)
-    add_segment(end_1)
-    add_segment(end_2)
-    add_segment(end_3)
+    # Add all segments in order (variable length: 1-10 segments)
+    for segment_config in segment_configs:
+        add_segment(segment_config)
 
     # Build the final prompt
     # NOTE: Each segment has delimiter appended, pass delimiter="" to concatenate

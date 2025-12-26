@@ -143,24 +143,10 @@ def generate_image(
     runs: int,
     seed: int,
     use_random_seed: bool,
-    start_1: SegmentConfig,
-    start_2: SegmentConfig,
-    start_3: SegmentConfig,
-    mid_1: SegmentConfig,
-    mid_2: SegmentConfig,
-    mid_3: SegmentConfig,
-    end_1: SegmentConfig,
-    end_2: SegmentConfig,
-    end_3: SegmentConfig,
+    segment_configs: list[SegmentConfig],
     state: UIState,
     input_images: list[str] | None = None,
     instruction: str | None = None,
-    condition_type_2: str = "None",
-    condition_text_2: str = "",
-    condition_dynamic_2: bool = False,
-    condition_type_3: str = "None",
-    condition_text_3: str = "",
-    condition_dynamic_3: bool = False,
 ) -> tuple[list[str], str, str, UIState]:
     """Generate or edit image(s) from the UI inputs.
 
@@ -173,27 +159,17 @@ def generate_image(
         runs: Number of runs to execute
         seed: Random seed
         use_random_seed: Whether to use a random seed
-        start_1: Start segment 1 configuration
-        start_2: Start segment 2 configuration
-        start_3: Start segment 3 configuration
-        mid_1: Mid segment 1 configuration
-        mid_2: Mid segment 2 configuration
-        mid_3: Mid segment 3 configuration
-        end_1: End segment 1 configuration
-        end_2: End segment 2 configuration
-        end_3: End segment 3 configuration
+        segment_configs: List of segment configurations (1-10 segments)
         state: UI state
         input_images: Input image paths for image editing (1-3 images, optional)
         instruction: Editing instruction for image editing (optional)
-        condition_type_2: Type of condition for Start 2 ("None", "Character", "Facial", "Both")
-        condition_text_2: Current condition text for Start 2 (used if not dynamic)
-        condition_dynamic_2: Whether to regenerate Start 2 condition per-run
-        condition_type_3: Type of condition for Start 3 ("None", "Character", "Facial", "Both")
-        condition_text_3: Current condition text for Start 3 (used if not dynamic)
-        condition_dynamic_3: Whether to regenerate Start 3 condition per-run
 
     Returns:
         Tuple of (image_paths, info_text, seed_used, updated_state)
+
+    Notes:
+        Each segment can have conditions (character/facial) and dynamic flags.
+        Dynamic segments and conditions are regenerated per-run.
     """
     # Import here to avoid circular dependency
     from pathlib import Path
@@ -259,12 +235,14 @@ def generate_image(
         # Validate generation parameters
         validate_generation_params(params)
 
-        # Check if any segment is dynamic
-        segments = (start_1, start_2, start_3, mid_1, mid_2, mid_3, end_1, end_2, end_3)
-        has_dynamic = any(seg.dynamic for seg in segments)
+        # Check if any segment is dynamic or has dynamic conditions
+        has_dynamic = any(seg.dynamic for seg in segment_configs)
+        has_dynamic_conditions = any(
+            seg.condition_type != "None" and seg.condition_dynamic for seg in segment_configs
+        )
 
         # Validate segments
-        validate_segments(segments, config.inputs_dir, prompt)
+        validate_segments(tuple(segment_configs), config.inputs_dir, prompt)
 
         generated_paths = []
         seeds_used = []
@@ -275,68 +253,48 @@ def generate_image(
         for run in range(runs):
             logger.info(f"Starting run {run + 1}/{runs}")
 
-            # Regenerate conditions per-run if dynamic is enabled
+            # Regenerate conditions per-run if dynamic is enabled for any segment
             from dataclasses import replace
 
             from pipeworks.ui.handlers import generate_condition_by_type
 
-            current_start_2 = start_2  # Use original by default
-            current_start_3 = start_3  # Use original by default
+            # Process all segments and handle dynamic conditions
+            current_segments = []
+            for idx, seg in enumerate(segment_configs):
+                current_seg = seg  # Use original by default
 
-            # Handle dynamic condition for Start 2
-            if condition_type_2 != "None" and condition_dynamic_2:
-                # Generate new condition for this run (using random seed)
-                new_condition_text = generate_condition_by_type(condition_type_2, seed=None)
-                logger.info(
-                    f"Generated dynamic condition for Start 2 run {run + 1}: {new_condition_text}"
-                )
+                # Handle dynamic condition for this segment
+                if seg.condition_type != "None" and seg.condition_dynamic:
+                    # Generate new condition for this run (using random seed)
+                    new_condition_text = generate_condition_by_type(seg.condition_type, seed=None)
+                    logger.info(
+                        f"Generated dynamic condition for segment {idx} run {run + 1}: "
+                        f"{new_condition_text}"
+                    )
 
-                # Create modified Start 2 config with condition prepended
-                original_text = start_2.text
-                if original_text and original_text.strip():
-                    modified_text = f"{new_condition_text}{start_2.delimiter}{original_text}"
-                else:
-                    modified_text = new_condition_text
+                    # Create modified segment with condition prepended to text
+                    original_text = seg.text
+                    delimiter_value = seg.get_delimiter_value()
 
-                # Use dataclasses.replace to create modified config
-                current_start_2 = replace(start_2, text=modified_text)
+                    if original_text and original_text.strip():
+                        modified_text = f"{new_condition_text}{delimiter_value}{original_text}"
+                    else:
+                        modified_text = new_condition_text
 
-            # Handle dynamic condition for Start 3
-            if condition_type_3 != "None" and condition_dynamic_3:
-                # Generate new condition for this run (using random seed)
-                new_condition_text = generate_condition_by_type(condition_type_3, seed=None)
-                logger.info(
-                    f"Generated dynamic condition for Start 3 run {run + 1}: {new_condition_text}"
-                )
+                    # Use dataclasses.replace to create modified config
+                    current_seg = replace(seg, text=modified_text)
 
-                # Create modified Start 3 config with condition prepended
-                original_text = start_3.text
-                if original_text and original_text.strip():
-                    modified_text = f"{new_condition_text}{start_3.delimiter}{original_text}"
-                else:
-                    modified_text = new_condition_text
-
-                # Use dataclasses.replace to create modified config
-                current_start_3 = replace(start_3, text=modified_text)
+                current_segments.append(current_seg)
 
             # Generate batch_size images for this run
             for i in range(batch_size):
                 # Build prompt dynamically if any segment is dynamic (or conditions are dynamic)
-                if has_dynamic or condition_dynamic_2 or condition_dynamic_3:
+                if has_dynamic or has_dynamic_conditions:
                     try:
                         # Pass run index for Sequential mode support
-                        # Use current_start_2 and current_start_3 (which may have dynamic
-                        # conditions prepended)
+                        # Use current_segments (which may have dynamic conditions prepended)
                         current_prompt = build_combined_prompt(
-                            start_1,
-                            current_start_2,
-                            current_start_3,
-                            mid_1,
-                            mid_2,
-                            mid_3,
-                            end_1,
-                            end_2,
-                            end_3,
+                            current_segments,
                             state,
                             run_index=run,
                         )
@@ -426,7 +384,6 @@ def generate_image(
 
         # Dynamic prompts info
         dynamic_info = ""
-        has_dynamic_conditions = condition_dynamic_2 or condition_dynamic_3
         if has_dynamic or has_dynamic_conditions:
             if has_dynamic and has_dynamic_conditions:
                 dynamic_info = (

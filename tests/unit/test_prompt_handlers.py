@@ -40,7 +40,7 @@ class TestAddSegmentLogic:
     def test_text_only_segment(self, mock_state, empty_segments):
         """Test segment with only text (no file)."""
         start_1 = SegmentConfig(text="wizard")
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should call build_prompt with a text segment with delimiter appended
         mock_state.prompt_builder.build_prompt.assert_called_once()
@@ -52,7 +52,7 @@ class TestAddSegmentLogic:
     def test_file_only_segment(self, mock_state, empty_segments):
         """Test segment with only file (no text)."""
         start_1 = SegmentConfig(file="test.txt", mode="Random Line")
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should call build_prompt with resolved file content as text segment
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
@@ -69,7 +69,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should combine text + space + file_content, then append delimiter at end
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
@@ -86,7 +86,7 @@ class TestAddSegmentLogic:
             text_order="file_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should combine file_content + space + text, then append delimiter at end
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
@@ -103,7 +103,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Period-Space (. )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         # Hardcoded space between text and file, delimiter at end
@@ -118,7 +118,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Space ( )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         # Hardcoded space between text and file, space delimiter at end
@@ -133,7 +133,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma (,)",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         # Hardcoded space between text and file, comma at end
@@ -148,7 +148,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Period (.)",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         # Hardcoded space between text and file, period at end
@@ -157,7 +157,7 @@ class TestAddSegmentLogic:
     def test_empty_segment(self, mock_state, empty_segments):
         """Test segment with no text and no file is skipped."""
         start_1 = SegmentConfig()
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should not add any segments
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
@@ -166,7 +166,7 @@ class TestAddSegmentLogic:
     def test_whitespace_only_text_skipped(self, mock_state, empty_segments):
         """Test segment with whitespace-only text is skipped."""
         start_1 = SegmentConfig(text="   \n\t  ")
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         assert len(segments) == 0
@@ -182,7 +182,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should fall back to text only with delimiter appended
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
@@ -199,7 +199,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should call get_specific_line with line number
         mock_state.prompt_builder.get_specific_line.assert_called_once_with(
@@ -220,7 +220,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should call get_line_range with delimiter for joining lines
         mock_state.prompt_builder.get_line_range.assert_called_once_with(
@@ -239,7 +239,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should call get_all_lines with delimiter for joining lines
         mock_state.prompt_builder.get_all_lines.assert_called_once_with(
@@ -259,7 +259,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         # Should call get_random_lines with delimiter for joining lines
         mock_state.prompt_builder.get_random_lines.assert_called_once_with(
@@ -279,7 +279,9 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state, run_index=2)
+        result = build_combined_prompt(
+            [start_1] + empty_segments[1:], state=mock_state, run_index=2
+        )
 
         # Should call get_sequential_line with run_index
         mock_state.prompt_builder.get_sequential_line.assert_called_once_with(
@@ -302,7 +304,7 @@ class TestAddSegmentLogic:
         start_3 = SegmentConfig(file="colors.txt", mode="Random Line")
 
         result = build_combined_prompt(
-            start_1, start_2, start_3, *empty_segments[3:], state=mock_state
+            [start_1, start_2, start_3] + empty_segments[3:], state=mock_state
         )
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
@@ -315,7 +317,7 @@ class TestAddSegmentLogic:
     def test_text_strips_whitespace(self, mock_state, empty_segments):
         """Test that text whitespace is stripped."""
         start_1 = SegmentConfig(text="  wizard  ")
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         # Text is stripped, then delimiter appended
@@ -330,7 +332,7 @@ class TestAddSegmentLogic:
             text_order="text_first",
             delimiter="Comma-Space (, )",  # Use label format
         )
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=mock_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], state=mock_state)
 
         segments = mock_state.prompt_builder.build_prompt.call_args[0][0]
         # Text is stripped, hardcoded space between text and file, delimiter at end
