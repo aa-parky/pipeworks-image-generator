@@ -44,7 +44,7 @@ class TestTextOrderFeature:
             delimiter="Comma-Space (, )",  # Use label format
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # New behavior: space between text and file, delimiter at end
         assert result == "wizard robed, "
@@ -63,7 +63,7 @@ class TestTextOrderFeature:
             delimiter="Comma-Space (, )",  # Use label format
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # New behavior: space between file and text, delimiter at end
         assert result == "robed wizard, "
@@ -74,7 +74,7 @@ class TestTextOrderFeature:
             text="wizard", text_order="text_first", delimiter="Comma-Space (, )"
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # New behavior: delimiter appended to text
         assert result == "wizard, "
@@ -91,7 +91,7 @@ class TestTextOrderFeature:
             delimiter="Comma-Space (, )",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # New behavior: delimiter appended to file content
         assert result == "robed, "
@@ -115,7 +115,7 @@ class TestDelimiterFeature:
             delimiter="Comma-Space (, )",  # Default
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         assert result == "wizard robed, "
 
@@ -132,7 +132,7 @@ class TestDelimiterFeature:
             delimiter="Period-Space (. )",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         assert result == "A wizard wearing robes. "
 
@@ -149,7 +149,7 @@ class TestDelimiterFeature:
             delimiter="Space ( )",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         assert result == "wizard robed "
 
@@ -166,7 +166,7 @@ class TestDelimiterFeature:
             delimiter="Comma (,)",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         assert result == "wizard robed,"
 
@@ -183,7 +183,7 @@ class TestDelimiterFeature:
             delimiter="Period (.)",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         assert result == "wizard robed."
 
@@ -215,9 +215,7 @@ class TestMultipleSegments:
             delimiter="Comma-Space (, )",  # Comma-space
         )
 
-        result = build_combined_prompt(
-            start_1, start_2, *empty_segments[2:], state=initialized_state
-        )
+        result = build_combined_prompt([start_1, start_2] + empty_segments[2:], initialized_state)
 
         # New behavior: space between text and file, delimiter appended
         # Segment 1: "wizard robed. " Segment 2: "castle old, "
@@ -244,9 +242,7 @@ class TestMultipleSegments:
             delimiter="Comma-Space (, )",
         )
 
-        result = build_combined_prompt(
-            start_1, start_2, *empty_segments[2:], state=initialized_state
-        )
+        result = build_combined_prompt([start_1, start_2] + empty_segments[2:], initialized_state)
 
         # New behavior: space within segments, delimiter at end
         assert result == "wizard robed, ancient castle, "
@@ -271,14 +267,14 @@ class TestBackwardCompatibility:
             # delimiter defaults to "Space ( )"
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # New behavior: text first, space between, space delimiter at end
         assert result == "wizard robed "
 
     def test_empty_segments_still_skipped(self, initialized_state, empty_segments):
         """Test that empty segments are still skipped."""
-        result = build_combined_prompt(*empty_segments, state=initialized_state)
+        result = build_combined_prompt(empty_segments, initialized_state)
 
         assert result == ""
 
@@ -298,7 +294,7 @@ class TestEdgeCases:
             delimiter="Comma-Space (, )",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # Should fall back to text only with delimiter
         assert result == "wizard, "
@@ -316,7 +312,7 @@ class TestEdgeCases:
             delimiter="Comma-Space (, )",
         )
 
-        result = build_combined_prompt(start_1, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([start_1] + empty_segments[1:], initialized_state)
 
         # Whitespace stripped, then combined with space and delimiter
         assert result == "wizard robed, "
@@ -332,7 +328,7 @@ class TestEdgeCases:
         cfg = SegmentConfig(
             text="prefix", file="test.txt", mode="Specific Line", line=2, delimiter="Comma (,)"
         )
-        result = build_combined_prompt(cfg, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([cfg] + empty_segments[1:], initialized_state)
         assert result == "prefix line2,"
 
         # Test Line Range - delimiter used within file lines AND at end
@@ -344,10 +340,10 @@ class TestEdgeCases:
             range_end=2,
             delimiter="Comma (,)",
         )
-        result = build_combined_prompt(cfg, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([cfg] + empty_segments[1:], initialized_state)
         assert result == "prefix line1,line2,"
 
         # Test All Lines - delimiter used within file lines AND at end
         cfg = SegmentConfig(text="prefix", file="test.txt", mode="All Lines", delimiter="Comma (,)")
-        result = build_combined_prompt(cfg, *empty_segments[1:], state=initialized_state)
+        result = build_combined_prompt([cfg] + empty_segments[1:], initialized_state)
         assert result == "prefix line1,line2,line3,"

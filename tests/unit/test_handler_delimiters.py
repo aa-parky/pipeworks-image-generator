@@ -68,7 +68,7 @@ class TestSegmentDelimiterAppending:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3, test_state
+            [seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3], test_state
         )
 
         # Should have delimiter appended: "beautiful landscape,"
@@ -81,7 +81,7 @@ class TestSegmentDelimiterAppending:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3, test_state
+            [seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3], test_state
         )
 
         # Should be "line1.line1.line1."
@@ -100,7 +100,7 @@ class TestSegmentDelimiterAppending:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3, test_state
+            [seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3], test_state
         )
 
         # Should be "photo of line1, photo of line1, photo of line1, "
@@ -117,7 +117,7 @@ class TestSegmentConcatenation:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg3, seg3, seg3, seg3, seg3, seg3, test_state
+            [seg1, seg2, seg3, seg3, seg3, seg3, seg3, seg3, seg3], test_state
         )
 
         # Should be: "beautiful," + "landscape." with NO space or delimiter between
@@ -131,7 +131,7 @@ class TestSegmentConcatenation:
         empty = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, empty, empty, empty, empty, empty, empty, test_state
+            [seg1, seg2, seg3, empty, empty, empty, empty, empty, empty], test_state
         )
 
         # Should be: "A," + "B." + "C" (no delimiter on last one)
@@ -148,7 +148,7 @@ class TestEmptyDelimiter:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg3, seg3, seg3, seg3, seg3, seg3, test_state
+            [seg1, seg2, seg3, seg3, seg3, seg3, seg3, seg3, seg3], test_state
         )
 
         # Should concatenate directly with no separators
@@ -162,7 +162,7 @@ class TestEmptyDelimiter:
         empty = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, empty, empty, empty, empty, empty, empty, test_state
+            [seg1, seg2, seg3, empty, empty, empty, empty, empty, empty], test_state
         )
 
         # Should be: "word1" + "word2," + "word3"
@@ -185,7 +185,7 @@ class TestMultiLineFileDelimiters:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3, test_state
+            [seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3], test_state
         )
 
         # Lines joined with ", " AND delimiter appended: "line1, line2, line3, "
@@ -199,7 +199,7 @@ class TestMultiLineFileDelimiters:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3, test_state
+            [seg1, seg2, seg3, seg1, seg2, seg3, seg1, seg2, seg3], test_state
         )
 
         # Lines joined with "." AND delimiter appended: "line1.line2.line3."
@@ -218,7 +218,7 @@ class TestRealWorldScenarios:
         empty = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, empty, empty, empty, empty, empty, empty, test_state
+            [seg1, seg2, seg3, empty, empty, empty, empty, empty, empty], test_state
         )
 
         # Should create: "beautiful landscape, sunset, 8k uhd"
@@ -232,7 +232,7 @@ class TestRealWorldScenarios:
         empty = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, empty, empty, empty, empty, empty, empty, test_state
+            [seg1, seg2, seg3, empty, empty, empty, empty, empty, empty], test_state
         )
 
         # Should create: "A wizard in robes. Standing in forest. Magical atmosphere"
@@ -249,7 +249,7 @@ class TestBackwardCompatibility:
         seg3 = SegmentConfig()  # Empty
 
         result = build_combined_prompt(
-            seg1, seg2, seg3, seg3, seg3, seg3, seg3, seg3, seg3, test_state
+            [seg1, seg2, seg3, seg3, seg3, seg3, seg3, seg3, seg3], test_state
         )
 
         # Should be: "beautiful " + "landscape " = "beautiful landscape "
