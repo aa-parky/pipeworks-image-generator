@@ -647,10 +647,37 @@ def create_generation_tab(ui_state):
         # Initialize state
         ui_state_val = initialize_ui_state(ui_state_val)
 
+        # Process segments with conditions (prepend condition to text)
+        # This mirrors the logic in generate_image for consistency
+        from dataclasses import replace
+
+        processed_configs = []
+        for seg in segment_configs:
+            # If segment has a condition, prepend it to the text
+            if seg.condition_type != "None":
+                # Use the condition_text if static, or generate if dynamic
+                # For build prompt, we use the current condition_text (no randomization)
+                condition_text = seg.condition_text if seg.condition_text else ""
+
+                if condition_text:
+                    # Get delimiter and prepend condition to text
+                    delimiter_value = seg.get_delimiter_value()
+                    original_text = seg.text if seg.text else ""
+
+                    if original_text and original_text.strip():
+                        modified_text = f"{condition_text}{delimiter_value}{original_text}"
+                    else:
+                        modified_text = condition_text
+
+                    # Create modified config with condition prepended
+                    seg = replace(seg, text=modified_text)
+
+            processed_configs.append(seg)
+
         # Build prompt using refactored handler (accepts list[SegmentConfig])
         try:
             prompt = build_combined_prompt(
-                segment_configs,  # Pass list directly
+                processed_configs,  # Pass processed configs with conditions
                 ui_state_val,
             )
         except ValidationError as e:
@@ -664,6 +691,8 @@ def create_generation_tab(ui_state):
                 cfg_idx = visible_indices.index(i)
                 cfg = segment_configs[cfg_idx]
                 title = f"**Segment {i}**"
+                if cfg.condition_type != "None":
+                    title += f" • 🎭 {cfg.condition_type}"
                 if cfg.file and cfg.file != "(None)":
                     title += f" • 📄 {cfg.file}"
                 if cfg.dynamic:
