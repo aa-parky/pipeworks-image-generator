@@ -261,7 +261,9 @@ CONDITION_TYPES = [
     "None",  # No condition generation
     "Character",  # Generate character conditions (physique, wealth, etc.)
     "Facial",  # Generate facial signal conditions
+    "Occupation",  # Generate occupation conditions (legitimacy, visibility, etc.)
     "Both",  # Generate both character and facial conditions
+    "All",  # Generate character, facial, and occupation conditions
 ]
 
 # Text order options

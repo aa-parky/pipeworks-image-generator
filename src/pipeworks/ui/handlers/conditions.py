@@ -1,10 +1,10 @@
-"""Condition generation handlers for character and facial conditions.
+"""Condition generation handlers for character, facial, and occupation conditions.
 
-This module provides handlers for generating character and facial conditions
-in the Gradio UI. It supports:
+This module provides handlers for generating conditions in the Gradio UI. It supports:
 - Character conditions (physique, wealth, health, demeanor, age)
 - Facial conditions (facial signals like weathered, sharp-featured, etc.)
-- Combined conditions (both character and facial)
+- Occupation conditions (legitimacy, visibility, moral load, dependency, risk)
+- Combined conditions (character + facial, or all three)
 
 The handlers are used in the UI to respond to dropdown changes and regenerate
 button clicks in Start 2 and Start 3 segments.
@@ -23,7 +23,8 @@ def generate_condition_by_type(condition_type: str, seed: int | None = None) -> 
 
     Args:
         condition_type: Type of condition to generate.
-                       Must be one of: "None", "Character", "Facial", "Both"
+                       Must be one of: "None", "Character", "Facial", "Occupation",
+                       "Both" (Character + Facial), or "All" (all three)
         seed: Optional random seed for reproducible generation.
              If None, uses system entropy (non-reproducible).
 
@@ -38,8 +39,14 @@ def generate_condition_by_type(condition_type: str, seed: int | None = None) -> 
         >>> generate_condition_by_type("Facial", seed=42)
         'weathered'
 
+        >>> generate_condition_by_type("Occupation", seed=42)
+        'tolerated, discreet, burdened'
+
         >>> generate_condition_by_type("Both", seed=42)
         'wiry, modest, old, weathered'
+
+        >>> generate_condition_by_type("All", seed=42)
+        'wiry, modest, old, weathered, tolerated, discreet'
 
         >>> generate_condition_by_type("None")
         ''
@@ -53,8 +60,14 @@ def generate_condition_by_type(condition_type: str, seed: int | None = None) -> 
     elif condition_type == "Facial":
         return _generate_facial_condition(seed)
 
+    elif condition_type == "Occupation":
+        return _generate_occupation_condition(seed)
+
     elif condition_type == "Both":
         return _generate_both_conditions(seed)
+
+    elif condition_type == "All":
+        return _generate_all_conditions(seed)
 
     else:
         logger.warning(f"Unknown condition type: {condition_type}")
@@ -96,6 +109,25 @@ def _generate_facial_condition(seed: int | None = None) -> str:
     return facial_condition_to_prompt(condition)
 
 
+def _generate_occupation_condition(seed: int | None = None) -> str:
+    """Generate occupation condition text.
+
+    Args:
+        seed: Optional random seed for reproducible generation
+
+    Returns:
+        Comma-separated occupation condition text
+        Example: "tolerated, discreet, burdened"
+    """
+    from pipeworks.core.condition_axis import (
+        generate_occupation_condition,
+        occupation_condition_to_prompt,
+    )
+
+    condition = generate_occupation_condition(seed=seed)
+    return occupation_condition_to_prompt(condition)
+
+
 def _generate_both_conditions(seed: int | None = None) -> str:
     """Generate both character and facial conditions.
 
@@ -128,6 +160,38 @@ def _generate_both_conditions(seed: int | None = None) -> str:
         return facial_text
     else:
         return ""
+
+
+def _generate_all_conditions(seed: int | None = None) -> str:
+    """Generate character, facial, and occupation conditions.
+
+    All three conditions are generated using offset seeds to maintain
+    reproducibility while ensuring different but deterministic results.
+
+    Args:
+        seed: Optional random seed for reproducible generation
+
+    Returns:
+        Comma-separated combination of all three condition types
+        Example: "wiry, modest, old, weathered, tolerated, discreet"
+    """
+    # Generate all three condition types with offset seeds
+    character_text = _generate_character_condition(seed)
+    facial_seed = None if seed is None else seed + 1
+    facial_text = _generate_facial_condition(facial_seed)
+    occupation_seed = None if seed is None else seed + 2
+    occupation_text = _generate_occupation_condition(occupation_seed)
+
+    # Combine all non-empty conditions
+    parts = []
+    if character_text:
+        parts.append(character_text)
+    if facial_text:
+        parts.append(facial_text)
+    if occupation_text:
+        parts.append(occupation_text)
+
+    return ", ".join(parts)
 
 
 __all__ = [
