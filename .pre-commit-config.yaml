@@ -55,4 +55,4 @@ repos:
         args: [tests/unit/, --tb=short, --no-cov, -q, --maxfail=5, -m, "not requires_model and not slow"]
         language: system
         pass_filenames: false
-        always_run: true
+        types: [python]
