@@ -468,7 +468,21 @@ def create_generation_tab(ui_state):
 
     def add_segment_click_handler(
         segment_manager_state_value: dict[str, Any], ui_state_value: UIState
-    ) -> tuple[dict[str, Any], str, list[dict[str, Any]], UIState]:
+    ) -> tuple[
+        dict[str, Any],
+        str,
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        UIState,
+    ]:
         """Add a new segment when the Add button is clicked.
 
         Args:
@@ -477,7 +491,7 @@ def create_generation_tab(ui_state):
 
         Returns:
             Tuple of (updated_segment_manager_state, status_message,
-                     visibility_updates, updated_ui_state)
+                     *10_visibility_updates, updated_ui_state)
         """
 
         # Check if we can add
@@ -489,7 +503,7 @@ def create_generation_tab(ui_state):
                 segment_manager_state_value,
                 f"**Total: {len(visible_indices)} segment(s)** "
                 f"(Maximum {max_segments} reached)",
-                [gr.update() for _ in range(10)],  # No visibility changes
+                *[gr.update() for _ in range(10)],  # No visibility changes
                 ui_state_value,
             )
 
@@ -510,11 +524,25 @@ def create_generation_tab(ui_state):
         # Update status message
         status = f"**Total: {len(updated_visible)} segment(s)**"
 
-        return updated_state, status, visibility_updates, ui_state_value
+        return updated_state, status, *visibility_updates, ui_state_value
 
     def remove_segment_click_handler(
         segment_manager_state_value: dict[str, Any], ui_state_value: UIState
-    ) -> tuple[dict[str, Any], str, list[dict[str, Any]], UIState]:
+    ) -> tuple[
+        dict[str, Any],
+        str,
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        UIState,
+    ]:
         """Remove the last segment when the Remove button is clicked.
 
         Args:
@@ -523,7 +551,7 @@ def create_generation_tab(ui_state):
 
         Returns:
             Tuple of (updated_segment_manager_state, status_message,
-                     visibility_updates, updated_ui_state)
+                     *10_visibility_updates, updated_ui_state)
         """
 
         # Check if we can remove
@@ -535,7 +563,7 @@ def create_generation_tab(ui_state):
                 segment_manager_state_value,
                 f"**Total: {len(visible_indices)} segment(s)** "
                 f"(Minimum {min_segments} required)",
-                [gr.update() for _ in range(10)],  # No visibility changes
+                *[gr.update() for _ in range(10)],  # No visibility changes
                 ui_state_value,
             )
 
@@ -555,7 +583,7 @@ def create_generation_tab(ui_state):
         # Update status message
         status = f"**Total: {len(updated_visible)} segment(s)**"
 
-        return updated_state, status, visibility_updates, ui_state_value
+        return updated_state, status, *visibility_updates, ui_state_value
 
     # Wire up add/remove button handlers
     add_segment_btn.click(
