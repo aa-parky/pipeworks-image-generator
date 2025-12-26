@@ -240,10 +240,10 @@ def create_generation_tab(ui_state):
 
                 segment_status = gr.Markdown("**Total: 1 segment(s)**")
 
-                # Segment manager state (tracks visible segments)
+                # Segment manager state (tracks visible segment indices)
                 segment_manager_state = gr.State(
                     {
-                        "segments": [segments[0]],  # Only segment 0 visible initially
+                        "visible_indices": [0],  # Only segment 0 visible initially
                         "next_segment_id": 1,
                         "max_segments": 10,
                         "min_segments": 1,
@@ -479,36 +479,38 @@ def create_generation_tab(ui_state):
             Tuple of (updated_segment_manager_state, status_message,
                      visibility_updates, updated_ui_state)
         """
-        from pipeworks.ui.handlers.segments import add_segment_handler, can_add_segment
 
         # Check if we can add
-        if not can_add_segment(segment_manager_state_value):
-            max_segments = segment_manager_state_value.get("max_segments", 10)
+        visible_indices = segment_manager_state_value.get("visible_indices", [0])
+        max_segments = segment_manager_state_value.get("max_segments", 10)
+
+        if len(visible_indices) >= max_segments:
             return (
                 segment_manager_state_value,
-                f"**Total: {len(segment_manager_state_value.get('segments', []))} segment(s)** "
+                f"**Total: {len(visible_indices)} segment(s)** "
                 f"(Maximum {max_segments} reached)",
                 [gr.update() for _ in range(10)],  # No visibility changes
                 ui_state_value,
             )
 
-        # Add segment (updates state bookkeeping)
-        updated_state, message, updated_ui_state = add_segment_handler(
-            segment_manager_state_value, ui_state_value
-        )
+        # Add next segment index
+        next_index = len(visible_indices)
+        updated_visible = visible_indices + [next_index]
 
-        # Make the next segment visible
-        next_visible_index = len(updated_state["segments"])
-        visibility_updates = [gr.update(visible=(i <= next_visible_index)) for i in range(10)]
+        updated_state = {
+            "visible_indices": updated_visible,
+            "next_segment_id": segment_manager_state_value.get("next_segment_id", 1) + 1,
+            "max_segments": max_segments,
+            "min_segments": segment_manager_state_value.get("min_segments", 1),
+        }
 
-        # Update segment list to include the new segment
-        updated_state["segments"] = updated_state["segments"] + [segments[next_visible_index]]
+        # Make segments visible up to the new index
+        visibility_updates = [gr.update(visible=(i in updated_visible)) for i in range(10)]
 
         # Update status message
-        count = len(updated_state["segments"])
-        status = f"**Total: {count} segment(s)**"
+        status = f"**Total: {len(updated_visible)} segment(s)**"
 
-        return updated_state, status, visibility_updates, updated_ui_state
+        return updated_state, status, visibility_updates, ui_state_value
 
     def remove_segment_click_handler(
         segment_manager_state_value: dict[str, Any], ui_state_value: UIState
@@ -523,36 +525,35 @@ def create_generation_tab(ui_state):
             Tuple of (updated_segment_manager_state, status_message,
                      visibility_updates, updated_ui_state)
         """
-        from pipeworks.ui.handlers.segments import can_remove_segment, get_segment_count
 
         # Check if we can remove
-        if not can_remove_segment(segment_manager_state_value):
-            min_segments = segment_manager_state_value.get("min_segments", 1)
+        visible_indices = segment_manager_state_value.get("visible_indices", [0])
+        min_segments = segment_manager_state_value.get("min_segments", 1)
+
+        if len(visible_indices) <= min_segments:
             return (
                 segment_manager_state_value,
-                f"**Total: {len(segment_manager_state_value.get('segments', []))} segment(s)** "
+                f"**Total: {len(visible_indices)} segment(s)** "
                 f"(Minimum {min_segments} required)",
                 [gr.update() for _ in range(10)],  # No visibility changes
                 ui_state_value,
             )
 
-        # Remove last segment from state
-        current_count = get_segment_count(segment_manager_state_value)
-        updated_segments = segment_manager_state_value["segments"][:-1]
+        # Remove last visible index
+        updated_visible = visible_indices[:-1]
 
         updated_state = {
-            "segments": updated_segments,
+            "visible_indices": updated_visible,
             "next_segment_id": segment_manager_state_value.get("next_segment_id", 0),
             "max_segments": segment_manager_state_value.get("max_segments", 10),
-            "min_segments": segment_manager_state_value.get("min_segments", 1),
+            "min_segments": min_segments,
         }
 
-        # Hide the last segment
-        visibility_updates = [gr.update(visible=(i < current_count - 1)) for i in range(10)]
+        # Update visibility
+        visibility_updates = [gr.update(visible=(i in updated_visible)) for i in range(10)]
 
         # Update status message
-        count = len(updated_segments)
-        status = f"**Total: {count} segment(s)**"
+        status = f"**Total: {len(updated_visible)} segment(s)**"
 
         return updated_state, status, visibility_updates, ui_state_value
 
@@ -607,13 +608,13 @@ def create_generation_tab(ui_state):
             segment_values_list.append(seg_vals)
             start_idx += 14
 
-        # Get number of visible segments
-        visible_count = len(segment_manager_state_val.get("segments", []))
+        # Get visible segment indices
+        visible_indices = segment_manager_state_val.get("visible_indices", [0])
 
         # Convert visible segments to SegmentConfig objects
         segment_configs = []
-        for i in range(visible_count):
-            segment_configs.append(plugin.values_to_config(*segment_values_list[i]))
+        for idx in visible_indices:
+            segment_configs.append(plugin.values_to_config(*segment_values_list[idx]))
 
         # Initialize state
         ui_state_val = initialize_ui_state(ui_state_val)
@@ -630,8 +631,10 @@ def create_generation_tab(ui_state):
         # Update titles for all 10 segments (only visible ones will show)
         segment_titles = []
         for i in range(10):
-            if i < visible_count:
-                cfg = segment_configs[i]
+            if i in visible_indices:
+                # Find the corresponding config (visible_indices may not be sequential)
+                cfg_idx = visible_indices.index(i)
+                cfg = segment_configs[cfg_idx]
                 title = f"**Segment {i}**"
                 if cfg.file and cfg.file != "(None)":
                     title += f" • 📄 {cfg.file}"
@@ -706,13 +709,13 @@ def create_generation_tab(ui_state):
             segment_values_list.append(seg_vals)
             start_idx += 14
 
-        # Get number of visible segments
-        visible_count = len(segment_manager_state_val.get("segments", []))
+        # Get visible segment indices
+        visible_indices = segment_manager_state_val.get("visible_indices", [0])
 
         # Convert visible segments to SegmentConfig objects using CompleteSegmentPlugin
         segment_configs = []
-        for i in range(visible_count):
-            segment_configs.append(plugin.values_to_config(*segment_values_list[i]))
+        for idx in visible_indices:
+            segment_configs.append(plugin.values_to_config(*segment_values_list[idx]))
 
         # Collect input images (filter out None values)
         input_images = [img for img in [input_img_1, input_img_2, input_img_3] if img is not None]
