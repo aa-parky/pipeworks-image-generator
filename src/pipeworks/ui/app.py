@@ -329,11 +329,12 @@ def create_generation_tab(ui_state):
                     with gr.Group():
                         save_metadata_check = gr.Checkbox(
                             label="Save Metadata (.txt + .json)",
-                            value=False,
+                            value=True,  # Enabled by default so prompts are always saved
                             info="Save prompt and generation parameters to files",
                         )
 
-                        with gr.Group(visible=False) as metadata_settings:
+                        # Visible by default since plugin is enabled by default
+                        with gr.Group(visible=True) as metadata_settings:
                             metadata_folder = gr.Textbox(
                                 label="Metadata Subfolder",
                                 value="metadata",
