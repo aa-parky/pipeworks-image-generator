@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from pipeworks.core.config import PipeworksConfig
+from pipeworks.ui.aspect_ratios import AspectRatioPreset, PresetCategory
 from pipeworks.ui.models import GenerationParams, SegmentConfig, UIState
 
 
@@ -167,3 +168,37 @@ def sample_prompts() -> list[str]:
         "Short",
         "A very long prompt " * 20,  # Long prompt for testing limits
     ]
+
+
+@pytest.fixture
+def sample_preset() -> AspectRatioPreset:
+    """Sample aspect ratio preset for testing.
+
+    Returns:
+        AspectRatioPreset instance
+    """
+    return AspectRatioPreset(
+        name="Test 16:9 (1280x720)",
+        width=1280,
+        height=720,
+        ratio_string="16:9",
+        category=PresetCategory.SOCIAL_MEDIA,
+        description="Test preset for unit tests",
+    )
+
+
+@pytest.fixture
+def custom_preset() -> AspectRatioPreset:
+    """Custom aspect ratio preset for testing.
+
+    Returns:
+        AspectRatioPreset instance with None dimensions
+    """
+    return AspectRatioPreset(
+        name="Custom",
+        width=None,
+        height=None,
+        ratio_string="custom",
+        category=PresetCategory.CUSTOM,
+        description="Custom dimensions from config",
+    )

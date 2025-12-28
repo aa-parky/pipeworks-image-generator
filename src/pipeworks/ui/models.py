@@ -4,6 +4,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from .aspect_ratios import ASPECT_RATIOS  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 
@@ -239,18 +241,6 @@ SEGMENT_MODES = [
     "Random Multiple",
     "Sequential",
 ]
-
-ASPECT_RATIOS = {
-    "Square 1:1 (1024x1024)": (1024, 1024),
-    "Widescreen 16:9 (1280x720)": (1280, 720),
-    "Widescreen 16:9 (1600x896)": (1600, 896),
-    "Portrait 9:16 (720x1280)": (720, 1280),
-    "Portrait 9:16 (896x1600)": (896, 1600),
-    "Standard 3:2 (1280x832)": (1280, 832),
-    "Standard 2:3 (832x1280)": (832, 1280),
-    "Standard 3:2 (1536x1024)": (1536, 1024),
-    "Custom": None,  # Will use config defaults
-}
 
 # UI Constants
 MAX_SEED = 2**32 - 1

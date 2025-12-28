@@ -9,7 +9,8 @@ import gradio as gr
 from pipeworks.core.config import config
 from pipeworks.core.model_adapters import model_registry
 
-from ..models import ASPECT_RATIOS, MAX_SEED, GenerationParams, SegmentConfig, UIState
+from ..aspect_ratios import get_dimensions
+from ..models import MAX_SEED, GenerationParams, SegmentConfig, UIState
 from ..state import initialize_ui_state, switch_model
 from ..state import toggle_plugin as toggle_plugin_state
 from ..validation import (
@@ -124,13 +125,7 @@ def set_aspect_ratio(ratio_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
     Returns:
         Tuple of (width_update, height_update)
     """
-    dimensions = ASPECT_RATIOS.get(ratio_name)
-
-    if dimensions is None:  # Custom
-        width, height = config.default_width, config.default_height
-    else:
-        width, height = dimensions
-
+    width, height = get_dimensions(ratio_name, config)
     return gr.update(value=width), gr.update(value=height)
 
 

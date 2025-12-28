@@ -133,6 +133,7 @@ src/pipeworks/
 │   └── city_map.py    # City/map generation workflow
 └── ui/                # Gradio web interface
     ├── app.py         # Main UI layout and event wiring
+    ├── aspect_ratios.py  # Aspect ratio presets, validation, utilities
     ├── components.py  # Reusable Gradio component builders
     ├── handlers/      # Event handler business logic (5 modules)
     ├── models.py      # Pydantic models for UI state
@@ -330,6 +331,57 @@ workflow_registry.register(MyWorkflow)
 ```
 
 2. **Import in** `src/pipeworks/workflows/__init__.py`
+
+### Working with Aspect Ratios
+
+The aspect ratio system provides presets, validation, and utilities for image dimensions:
+
+```python
+from pipeworks.ui.aspect_ratios import (
+    AspectRatioPreset,
+    PresetCategory,
+    get_preset_by_name,
+    get_dimensions,
+    validate_dimensions,
+    list_preset_names,
+    get_presets_by_category,
+)
+from pipeworks.core.config import config
+
+# Get preset object with rich metadata
+preset = get_preset_by_name("Square 1:1 (1024x1024)")
+print(preset.is_square)       # True
+print(preset.category)        # "standard"
+print(preset.width, preset.height)  # 1024, 1024
+
+# Get dimensions for UI handler (with config fallback for Custom)
+width, height = get_dimensions("Widescreen 16:9 (1280x720)", config)
+# Returns: (1280, 720)
+
+# Validate custom dimensions (raises AspectRatioValidationError if invalid)
+validate_dimensions(1280, 720)  # OK - multiple of 64, within range
+# validate_dimensions(1000, 1000)  # Raises error: not multiple of 64
+
+# List all available presets
+all_presets = list_preset_names()
+# ['Square 1:1 (1024x1024)', 'Widescreen 16:9 (1280x720)', ..., 'Custom']
+
+# Filter presets by category
+social_media = get_presets_by_category(PresetCategory.SOCIAL_MEDIA)
+for preset in social_media:
+    print(f"{preset.name}: {preset.description}")
+```
+
+**Validation Constraints (Z-Image-Turbo):**
+- Dimensions must be positive integers
+- Range: 64-2048 pixels
+- Must be multiples of 64 (diffusion model requirement)
+- Custom preset uses config.default_width and config.default_height
+
+**Backward Compatibility:**
+- `ASPECT_RATIOS` dict still available from `models.py`
+- Maintains exact same structure: `{"preset name": (width, height) or None}`
+- UI code can continue using existing imports
 
 ### Writing Tests
 

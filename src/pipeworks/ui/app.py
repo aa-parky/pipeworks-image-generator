@@ -8,6 +8,7 @@ import gradio as gr
 from pipeworks.core.config import config
 from pipeworks.plugins.base import plugin_registry
 
+from .aspect_ratios import ASPECT_RATIOS
 from .components import (
     update_mode_visibility,
 )
@@ -31,7 +32,7 @@ from .handlers import (
     toggle_save_metadata_handler,
     update_plugin_config_handler,
 )
-from .models import ASPECT_RATIOS, DEFAULT_SEED, MAX_SEED, UIState
+from .models import DEFAULT_SEED, MAX_SEED, UIState
 from .state import initialize_ui_state
 from .validation import ValidationError
 
